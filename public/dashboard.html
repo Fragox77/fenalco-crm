@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CRM Fenalco — Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -217,10 +218,10 @@
         <div class="bg-white rounded-xl border border-gray-200">
           <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h2 class="font-semibold text-fenalco-purple">Últimos afiliados</h2>
-            <button
-              @click="setPage('afiliados')"
+            <a
+              href="/afiliados.html"
               class="text-xs text-fenalco-blue hover:underline font-medium"
-            >Ver todos →</button>
+            >Ver todos →</a>
           </div>
 
           <!-- Loading -->
@@ -397,6 +398,8 @@
         },
 
         setPage(id) {
+          if (id === 'afiliados') { window.location.href = '/afiliados.html'; return; }
+          if (id === 'cartera')   { window.location.href = '/cartera.html';   return; }
           this.activePage = id;
           this.sidebarOpen = false;
         },

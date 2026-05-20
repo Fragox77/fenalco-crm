@@ -5,14 +5,24 @@ const contactoSchema = new mongoose.Schema({
   cargo: { type: String, trim: true },
   email: { type: String, trim: true, lowercase: true },
   telefono: { type: String, trim: true },
+  hora: { type: String, trim: true },
+  estadoTarea: { type: String, enum: ['pendiente', 'realizada', 'vencida'] },
   esPrincipal: { type: Boolean, default: false },
 });
+
+const compromisoSchema = new mongoose.Schema({
+  fechaCompromiso: { type: Date, required: true },
+  monto: { type: Number, required: true },
+  descripcion: { type: String, trim: true },
+  cumplido: { type: Boolean, default: false },
+  ejecutivo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+}, { timestamps: true });
 
 const interaccionSchema = new mongoose.Schema(
   {
     tipo: {
       type: String,
-      enum: ['llamada', 'email', 'reunion', 'visita', 'otro'],
+      enum: ['llamada', 'email', 'reunion', 'visita', 'whatsapp', 'otro'],
       required: true,
     },
     fecha: { type: Date, default: Date.now },
@@ -72,16 +82,18 @@ const afiliadoSchema = new mongoose.Schema(
     },
     estadoCartera: {
       type: String,
-      enum: ['al_dia', 'en_mora', 'acuerdo_pago'],
+      enum: ['al_dia', 'en_mora', 'acuerdo_pago', 'suspendido'],
       default: 'al_dia',
     },
     diasMora: {
       type: Number,
       default: 0,
     },
-    notas: {
-      type: String,
-    },
+    valorMembresia: { type: Number },
+    cuotaMensual: { type: Number },
+    saldoPendiente: { type: Number, default: 0 },
+    compromisos: [compromisoSchema],
+    notas: { type: String },
     tags: [{ type: String, trim: true }],
   },
   { timestamps: true }
