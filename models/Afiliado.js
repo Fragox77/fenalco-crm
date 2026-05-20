@@ -99,6 +99,8 @@ const afiliadoSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-afiliadoSchema.index({ razonSocial: 'text', nit: 'text' });
+// Índices con collation español strength:1 — ignoran tildes y mayúsculas en búsquedas
+afiliadoSchema.index({ razonSocial: 1 }, { collation: { locale: 'es', strength: 1 } });
+afiliadoSchema.index({ nit: 1 },         { collation: { locale: 'es', strength: 1 } });
 
 module.exports = mongoose.model('Afiliado', afiliadoSchema);

@@ -86,6 +86,16 @@ router.post('/logout', protect, (req, res) => {
   res.json({ success: true, message: 'Sesión cerrada' });
 });
 
+// GET /api/auth/usuarios — lista para selects (requiere auth)
+router.get('/usuarios', protect, async (req, res) => {
+  try {
+    const usuarios = await User.find({ activo: true }).select('nombre email role').lean();
+    res.json({ success: true, usuarios });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener usuarios', error: error.message });
+  }
+});
+
 // PUT /api/auth/cambiar-password
 router.put('/cambiar-password', protect, async (req, res) => {
   const { passwordActual, passwordNueva } = req.body;

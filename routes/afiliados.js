@@ -5,6 +5,10 @@ const { protect } = require('../middleware/auth');
 
 // ── helpers ───────────────────────────────────────────────────
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Quita tildes y diacríticos para búsqueda aproximada
+const normalize  = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+const COLLATION_ES = { locale: 'es', strength: 1 }; // strength 1: ignora tildes Y mayúsculas
 
 // GET /api/afiliados/stats
 router.get('/stats', protect, async (req, res) => {
@@ -69,7 +73,7 @@ router.get('/cartera/lista', protect, async (req, res) => {
     if (rangoDias === '61+')   conditions.push({ diasMora: { $gt: 60 } });
 
     if (search) {
-      const re = new RegExp(escapeRegex(search), 'i');
+      const re = new RegExp(escapeRegex(normalize(search)), 'i');
       conditions.push({ $or: [{ razonSocial: re }, { nit: re }] });
     }
 
@@ -77,13 +81,14 @@ router.get('/cartera/lista', protect, async (req, res) => {
 
     const [afiliados, total] = await Promise.all([
       Afiliado.find(filter)
+        .collation(COLLATION_ES)
         .populate('ejecutivoAsignado', 'nombre')
         .sort({ diasMora: -1, saldoPendiente: -1 })
         .skip((page - 1) * limit)
         .limit(Number(limit))
         .select('razonSocial nit diasMora saldoPendiente fechaVencimiento estadoCartera ejecutivoAsignado interacciones compromisos')
         .lean(),
-      Afiliado.countDocuments(filter),
+      Afiliado.countDocuments(filter).collation(COLLATION_ES),
     ]);
 
     afiliados.forEach((a) => {
@@ -107,17 +112,18 @@ router.get('/', protect, async (req, res) => {
     if (estadoCartera) filter.estadoCartera = estadoCartera;
     if (estado) filter.estado = estado;
     if (search) {
-      const re = new RegExp(escapeRegex(search), 'i');
+      const re = new RegExp(escapeRegex(normalize(search)), 'i');
       filter.$or = [{ razonSocial: re }, { nit: re }];
     }
     const [afiliados, total] = await Promise.all([
       Afiliado.find(filter)
+        .collation(COLLATION_ES)
         .populate('ejecutivoAsignado', 'nombre')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(Number(limit))
         .lean(),
-      Afiliado.countDocuments(filter),
+      Afiliado.countDocuments(filter).collation(COLLATION_ES),
     ]);
     res.json({ success: true, afiliados, total, page: Number(page) });
   } catch (error) {
@@ -187,6 +193,50 @@ router.post('/:id/compromiso', protect, async (req, res) => {
     res.json({ success: true, message: 'Compromiso registrado. Estado actualizado a acuerdo de pago.' });
   } catch (error) {
     res.status(500).json({ message: 'Error al registrar compromiso', error: error.message });
+  }
+});
+
+// PUT /api/afiliados/:id
+router.put('/:id', protect, async (req, res) => {
+  try {
+    const {
+      razonSocial, nit, sector, subsector, tamano, estado,
+      estadoCartera, diasMora, saldoPendiente, valorMembresia, cuotaMensual,
+      ejecutivoAsignado, direccion, email, telefono,
+    } = req.body;
+
+    const afiliado = await Afiliado.findById(req.params.id);
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+
+    const campos = { razonSocial, nit, sector, subsector, tamano, estado, estadoCartera, valorMembresia, cuotaMensual };
+    Object.entries(campos).forEach(([k, v]) => { if (v !== undefined) afiliado[k] = v; });
+
+    if (diasMora       !== undefined) afiliado.diasMora       = Number(diasMora);
+    if (saldoPendiente !== undefined) afiliado.saldoPendiente = Number(saldoPendiente);
+    if (ejecutivoAsignado !== undefined) afiliado.ejecutivoAsignado = ejecutivoAsignado || null;
+
+    if (direccion) {
+      afiliado.direccion = {
+        ...(afiliado.direccion?.toObject ? afiliado.direccion.toObject() : afiliado.direccion),
+        ...direccion,
+      };
+    }
+
+    // Actualiza email/teléfono del contacto principal
+    if (email !== undefined || telefono !== undefined) {
+      const idx = afiliado.contactos.findIndex(c => c.esPrincipal);
+      const i   = idx >= 0 ? idx : 0;
+      if (afiliado.contactos[i]) {
+        if (email    !== undefined) afiliado.contactos[i].email    = email;
+        if (telefono !== undefined) afiliado.contactos[i].telefono = telefono;
+      }
+    }
+
+    await afiliado.save();
+    res.json({ success: true, message: 'Afiliado actualizado correctamente' });
+  } catch (error) {
+    if (error.code === 11000) return res.status(400).json({ message: 'El NIT ya está registrado para otro afiliado' });
+    res.status(500).json({ message: 'Error al actualizar afiliado', error: error.message });
   }
 });
 

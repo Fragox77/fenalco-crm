@@ -9,7 +9,12 @@
       "Bash(npm run *)",
       "Bash(node scripts/create-admin.js)",
       "Bash(node -e ' *)",
-      "Bash(git commit -m 'feat: login + dashboard base con paleta Fenalco *)"
+      "Bash(git commit -m 'feat: login + dashboard base con paleta Fenalco *)",
+      "Bash(git commit -m ' *)",
+      "Bash(node scripts/seed.js)",
+      "Bash(node -e \"require\\('./routes/afiliados'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./models/Afiliado'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./routes/afiliados'\\); require\\('./routes/auth'\\); console.log\\('OK'\\)\")"
     ]
   }
 }
