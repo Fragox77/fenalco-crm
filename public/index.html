@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRM Fenalco — Iniciar sesión</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            fenalco: {
+              purple: '#280071',
+              green:  '#00CE7C',
+              'green-hover': '#00b369',
+              blue:   '#009CDE',
+              gray:   '#484954',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="min-h-screen bg-[#f5f5f5] flex items-center justify-center p-4">
+
+  <div x-data="loginApp()" class="w-full max-w-md">
+
+    <!-- Card -->
+    <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+      <!-- Header -->
+      <div class="bg-fenalco-purple px-8 py-8 text-center">
+        <img src="/img/logo.svg" alt="Fenalco" class="h-12 mx-auto mb-2">
+        <p class="text-white/70 text-sm mt-1">NEXO Modulo CRM</p>
+      </div>
+
+      <!-- Formulario -->
+      <div class="px-8 py-8">
+        <h2 class="text-fenalco-purple font-semibold text-lg mb-6">Iniciar sesión</h2>
+
+        <form @submit.prevent="login" novalidate>
+
+          <!-- Email -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-fenalco-gray mb-1.5">
+              Correo electrónico
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                </svg>
+              </span>
+              <input
+                x-model="form.email"
+                type="email"
+                placeholder="usuario@fenalco.com"
+                autocomplete="email"
+                :class="errors.email ? 'border-red-400 focus:ring-red-300' : 'border-gray-300 focus:ring-fenalco-blue/40 focus:border-fenalco-blue'"
+                class="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition"
+              />
+            </div>
+            <p x-show="errors.email" x-text="errors.email" class="text-red-500 text-xs mt-1"></p>
+          </div>
+
+          <!-- Password -->
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-fenalco-gray mb-1.5">
+              Contraseña
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </span>
+              <input
+                x-model="form.password"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                :class="errors.password ? 'border-red-400 focus:ring-red-300' : 'border-gray-300 focus:ring-fenalco-blue/40 focus:border-fenalco-blue'"
+                class="w-full pl-10 pr-10 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition"
+              />
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                tabindex="-1"
+              >
+                <svg x-show="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0zm-3-9C7.477 3 3 7.477 3 12s4.477 9 9 9 9-4.477 9-9S16.523 3 12 3z" />
+                </svg>
+                <svg x-show="showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              </button>
+            </div>
+            <p x-show="errors.password" x-text="errors.password" class="text-red-500 text-xs mt-1"></p>
+          </div>
+
+          <!-- Error global -->
+          <div
+            x-show="errorMsg"
+            x-transition
+            class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-5"
+          >
+            <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                clip-rule="evenodd" />
+            </svg>
+            <span x-text="errorMsg"></span>
+          </div>
+
+          <!-- Botón -->
+          <button
+            type="submit"
+            :disabled="loading"
+            class="w-full bg-fenalco-green hover:bg-fenalco-green-hover active:bg-fenalco-green-hover disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <svg x-show="loading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span x-text="loading ? 'Verificando...' : 'Ingresar'"></span>
+          </button>
+
+        </form>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center text-fenalco-gray text-xs mt-6">
+      &copy; <span x-text="new Date().getFullYear()"></span> Fenalco — Todos los derechos reservados
+    </p>
+
+  </div>
+
+  <script>
+    function loginApp() {
+      return {
+        form: { email: '', password: '' },
+        errors: {},
+        errorMsg: '',
+        loading: false,
+        showPassword: false,
+
+        validate() {
+          this.errors = {};
+          if (!this.form.email) this.errors.email = 'El correo es obligatorio';
+          else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.form.email))
+            this.errors.email = 'Ingresa un correo válido';
+          if (!this.form.password) this.errors.password = 'La contraseña es obligatoria';
+          return Object.keys(this.errors).length === 0;
+        },
+
+        async login() {
+          this.errorMsg = '';
+          if (!this.validate()) return;
+
+          this.loading = true;
+          try {
+            const res = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(this.form),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+              this.errorMsg = data.message || 'Error al iniciar sesión';
+              return;
+            }
+
+            localStorage.setItem('crm_token', data.token);
+            localStorage.setItem('crm_role', data.user.role);
+            localStorage.setItem('crm_nombre', data.user.nombre);
+
+            window.location.href = '/dashboard.html';
+          } catch (err) {
+            this.errorMsg = 'No se pudo conectar con el servidor';
+          } finally {
+            this.loading = false;
+          }
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>

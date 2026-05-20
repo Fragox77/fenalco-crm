@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRM Fenalco — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            fenalco: {
+              purple: '#280071',
+              'purple-dark': '#1e0057',
+              'purple-light': '#3a0099',
+              green: '#00CE7C',
+              'green-hover': '#00b369',
+              blue: '#009CDE',
+              gray: '#484954',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body class="bg-[#f5f5f5] min-h-screen" x-data="dashApp()" x-init="init()">
+
+  <!-- ── SIDEBAR ──────────────────────────────────────────── -->
+  <!-- Overlay mobile -->
+  <div
+    x-show="sidebarOpen"
+    @click="sidebarOpen = false"
+    class="fixed inset-0 bg-black/40 z-20 lg:hidden"
+    x-transition:enter="transition-opacity duration-200"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition-opacity duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+  ></div>
+
+  <aside
+    :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+    class="fixed top-0 left-0 h-full w-64 bg-fenalco-purple z-30 flex flex-col transition-transform duration-300 ease-in-out"
+  >
+    <!-- Logo -->
+    <div class="flex items-center justify-center px-6 py-6 border-b border-white/10">
+      <img src="/img/logo.svg" alt="Fenalco" class="h-10"
+        onerror="this.outerHTML='<span class=\'text-white font-bold text-xl tracking-wide\'>Fenalco</span>'" />
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+
+      <template x-for="item in navItems" :key="item.id">
+        <button
+          @click="setPage(item.id)"
+          :class="activePage === item.id
+            ? 'bg-white/15 text-white'
+            : 'text-white/60 hover:bg-white/10 hover:text-white'"
+          class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+        >
+          <span x-html="item.icon" class="w-5 h-5 flex-shrink-0"></span>
+          <span x-text="item.label"></span>
+          <!-- Indicador activo -->
+          <span
+            x-show="activePage === item.id"
+            class="ml-auto w-1.5 h-1.5 rounded-full bg-fenalco-green"
+          ></span>
+        </button>
+      </template>
+
+    </nav>
+
+    <!-- Usuario sidebar bottom -->
+    <div class="px-4 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-fenalco-green flex items-center justify-center flex-shrink-0">
+          <span class="text-white text-xs font-bold" x-text="iniciales"></span>
+        </div>
+        <div class="min-w-0">
+          <p class="text-white text-xs font-medium truncate" x-text="nombre"></p>
+          <p class="text-white/50 text-xs capitalize" x-text="role"></p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── LAYOUT PRINCIPAL ──────────────────────────────────── -->
+  <div class="lg:ml-64 flex flex-col min-h-screen">
+
+    <!-- HEADER -->
+    <header class="bg-white border-b border-gray-200 px-4 lg:px-8 py-3 flex items-center justify-between sticky top-0 z-10">
+
+      <!-- Hamburger (mobile) -->
+      <button
+        @click="sidebarOpen = !sidebarOpen"
+        class="lg:hidden p-2 rounded-lg text-fenalco-gray hover:bg-gray-100 transition-colors"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      <!-- Breadcrumb -->
+      <div class="hidden lg:flex items-center gap-2">
+        <span class="text-fenalco-gray text-sm">CRM</span>
+        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <span class="text-fenalco-purple text-sm font-medium" x-text="navItems.find(n => n.id === activePage)?.label"></span>
+      </div>
+
+      <!-- Acciones header -->
+      <div class="flex items-center gap-3 ml-auto">
+        <!-- Nombre usuario -->
+        <div class="hidden sm:flex flex-col items-end">
+          <span class="text-sm font-medium text-gray-800" x-text="nombre"></span>
+          <span class="text-xs text-fenalco-gray capitalize" x-text="role"></span>
+        </div>
+        <!-- Avatar -->
+        <div class="w-8 h-8 rounded-full bg-fenalco-purple flex items-center justify-center">
+          <span class="text-white text-xs font-bold" x-text="iniciales"></span>
+        </div>
+        <!-- Logout -->
+        <button
+          @click="logout"
+          class="flex items-center gap-1.5 text-xs text-fenalco-gray hover:text-red-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50"
+          title="Cerrar sesión"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span class="hidden sm:inline">Salir</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── CONTENIDO PRINCIPAL ─────────────────────────────── -->
+    <main class="flex-1 px-4 lg:px-8 py-8">
+
+      <!-- ── PÁGINA: DASHBOARD ── -->
+      <div x-show="activePage === 'dashboard'">
+
+        <div class="mb-6">
+          <h1 class="text-xl font-bold text-fenalco-purple">Resumen general</h1>
+          <p class="text-fenalco-gray text-sm mt-0.5">Métricas de afiliados y cartera</p>
+        </div>
+
+        <!-- Tarjetas métricas -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+
+          <!-- Total -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-fenalco-purple/10 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-fenalco-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <p class="text-fenalco-gray text-xs font-medium uppercase tracking-wide">Total afiliados</p>
+              <p class="text-2xl font-bold text-fenalco-purple mt-0.5" x-text="loading ? '—' : stats.total"></p>
+            </div>
+          </div>
+
+          <!-- Al día -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-[#00CE7C]/10 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-[#00CE7C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p class="text-fenalco-gray text-xs font-medium uppercase tracking-wide">Al día</p>
+              <p class="text-2xl font-bold text-[#00CE7C] mt-0.5" x-text="loading ? '—' : stats.al_dia"></p>
+            </div>
+          </div>
+
+          <!-- En mora -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p class="text-fenalco-gray text-xs font-medium uppercase tracking-wide">En mora</p>
+              <p class="text-2xl font-bold text-red-500 mt-0.5" x-text="loading ? '—' : stats.en_mora"></p>
+            </div>
+          </div>
+
+          <!-- Acuerdo de pago -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <div>
+              <p class="text-fenalco-gray text-xs font-medium uppercase tracking-wide">Acuerdo de pago</p>
+              <p class="text-2xl font-bold text-amber-500 mt-0.5" x-text="loading ? '—' : stats.acuerdo_pago"></p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tabla recientes -->
+        <div class="bg-white rounded-xl border border-gray-200">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h2 class="font-semibold text-fenalco-purple">Últimos afiliados</h2>
+            <button
+              @click="setPage('afiliados')"
+              class="text-xs text-fenalco-blue hover:underline font-medium"
+            >Ver todos →</button>
+          </div>
+
+          <!-- Loading -->
+          <div x-show="loading" class="flex items-center justify-center py-12">
+            <svg class="animate-spin w-6 h-6 text-fenalco-purple" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          </div>
+
+          <!-- Error -->
+          <div x-show="!loading && error" class="text-center py-12 text-red-500 text-sm" x-text="error"></div>
+
+          <!-- Tabla -->
+          <div x-show="!loading && !error" class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-fenalco-gray text-xs uppercase tracking-wide border-b border-gray-100">
+                  <th class="px-6 py-3 font-medium">Razón social</th>
+                  <th class="px-6 py-3 font-medium">NIT</th>
+                  <th class="px-6 py-3 font-medium">Estado afiliación</th>
+                  <th class="px-6 py-3 font-medium">Cartera</th>
+                  <th class="px-6 py-3 font-medium text-right">Días mora</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                <template x-for="a in recientes" :key="a._id">
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-3.5 font-medium text-gray-800" x-text="a.razonSocial"></td>
+                    <td class="px-6 py-3.5 text-fenalco-gray font-mono text-xs" x-text="a.nit"></td>
+                    <td class="px-6 py-3.5">
+                      <span
+                        :class="estadoBadge(a.estado).cls"
+                        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                        x-text="estadoBadge(a.estado).label"
+                      ></span>
+                    </td>
+                    <td class="px-6 py-3.5">
+                      <span
+                        :class="carteraBadge(a.estadoCartera).cls"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                      >
+                        <span :class="carteraBadge(a.estadoCartera).dot" class="w-1.5 h-1.5 rounded-full"></span>
+                        <span x-text="carteraBadge(a.estadoCartera).label"></span>
+                      </span>
+                    </td>
+                    <td class="px-6 py-3.5 text-right">
+                      <span
+                        :class="a.diasMora > 0 ? 'text-red-500 font-semibold' : 'text-fenalco-gray'"
+                        x-text="a.diasMora > 0 ? a.diasMora + ' días' : '—'"
+                      ></span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!loading && recientes.length === 0">
+                  <td colspan="5" class="px-6 py-10 text-center text-fenalco-gray text-sm">Sin datos</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── PÁGINA: AFILIADOS ── -->
+      <div x-show="activePage === 'afiliados'">
+        <div class="mb-6">
+          <h1 class="text-xl font-bold text-fenalco-purple">Afiliados</h1>
+          <p class="text-fenalco-gray text-sm mt-0.5">Gestión del padrón de afiliados</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-fenalco-gray text-sm">
+          Módulo en construcción
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: CARTERA ── -->
+      <div x-show="activePage === 'cartera'">
+        <div class="mb-6">
+          <h1 class="text-xl font-bold text-fenalco-purple">Cartera</h1>
+          <p class="text-fenalco-gray text-sm mt-0.5">Seguimiento de pagos y mora</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-fenalco-gray text-sm">
+          Módulo en construcción
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: REPORTES ── -->
+      <div x-show="activePage === 'reportes'">
+        <div class="mb-6">
+          <h1 class="text-xl font-bold text-fenalco-purple">Reportes</h1>
+          <p class="text-fenalco-gray text-sm mt-0.5">Análisis e informes</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-fenalco-gray text-sm">
+          Módulo en construcción
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    function dashApp() {
+      return {
+        // sesión
+        token: localStorage.getItem('crm_token'),
+        nombre: localStorage.getItem('crm_nombre') || 'Usuario',
+        role: localStorage.getItem('crm_role') || '',
+
+        // ui
+        sidebarOpen: false,
+        activePage: 'dashboard',
+
+        // datos
+        loading: true,
+        error: '',
+        stats: { total: 0, al_dia: 0, en_mora: 0, acuerdo_pago: 0 },
+        recientes: [],
+
+        navItems: [
+          {
+            id: 'dashboard',
+            label: 'Dashboard',
+            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>',
+          },
+          {
+            id: 'afiliados',
+            label: 'Afiliados',
+            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+          },
+          {
+            id: 'cartera',
+            label: 'Cartera',
+            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>',
+          },
+          {
+            id: 'reportes',
+            label: 'Reportes',
+            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+          },
+        ],
+
+        get iniciales() {
+          return this.nombre
+            .split(' ')
+            .slice(0, 2)
+            .map(w => w[0])
+            .join('')
+            .toUpperCase();
+        },
+
+        async init() {
+          if (!this.token) { window.location.href = '/'; return; }
+          await this.fetchStats();
+        },
+
+        async fetchStats() {
+          this.loading = true;
+          this.error = '';
+          try {
+            const res = await fetch('/api/afiliados/stats', {
+              headers: { Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+            });
+            if (res.status === 401) { this.logout(); return; }
+            if (!res.ok) throw new Error('Error del servidor');
+            const data = await res.json();
+            this.stats = data.stats;
+            this.recientes = data.recientes;
+          } catch (err) {
+            this.error = 'No se pudieron cargar las estadísticas';
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        setPage(id) {
+          this.activePage = id;
+          this.sidebarOpen = false;
+        },
+
+        estadoBadge(estado) {
+          const map = {
+            activo:    { label: 'Activo',    cls: 'bg-green-100 text-green-700' },
+            inactivo:  { label: 'Inactivo',  cls: 'bg-gray-100 text-gray-500' },
+            prospecto: { label: 'Prospecto', cls: 'bg-blue-100 text-blue-700' },
+            retirado:  { label: 'Retirado',  cls: 'bg-red-100 text-red-600' },
+          };
+          return map[estado] || { label: estado, cls: 'bg-gray-100 text-gray-500' };
+        },
+
+        carteraBadge(cartera) {
+          const map = {
+            al_dia:       { label: 'Al día',          dot: 'bg-[#00CE7C]', cls: 'bg-[#00CE7C]/10 text-[#009955]' },
+            en_mora:      { label: 'En mora',          dot: 'bg-red-500',   cls: 'bg-red-50 text-red-600' },
+            acuerdo_pago: { label: 'Acuerdo de pago', dot: 'bg-amber-400', cls: 'bg-amber-50 text-amber-700' },
+          };
+          return map[cartera] || { label: cartera, dot: 'bg-gray-400', cls: 'bg-gray-100 text-gray-500' };
+        },
+
+        logout() {
+          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+          localStorage.removeItem('crm_token');
+          localStorage.removeItem('crm_role');
+          localStorage.removeItem('crm_nombre');
+          window.location.href = '/';
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>
