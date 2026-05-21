@@ -25,6 +25,7 @@
       }
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
@@ -391,12 +392,120 @@
 
       <!-- ── PÁGINA: REPORTES ── -->
       <div x-show="activePage === 'reportes'">
-        <div class="mb-6">
-          <h1 class="text-xl font-bold text-fenalco-purple">Reportes</h1>
-          <p class="text-fenalco-gray text-sm mt-0.5">Análisis e informes</p>
+
+        <div class="mb-6 flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-fenalco-purple">Reportes</h1>
+            <p class="text-fenalco-gray text-sm mt-0.5">Análisis de cartera y actividad</p>
+          </div>
+          <button @click="fetchReportes()" :disabled="reportesLoading"
+            class="flex items-center gap-1.5 text-sm border border-gray-300 text-fenalco-gray px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg :class="reportesLoading ? 'animate-spin' : ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Actualizar
+          </button>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-fenalco-gray text-sm">
-          Módulo en construcción
+
+        <!-- Loading -->
+        <div x-show="reportesLoading" class="flex items-center justify-center py-20">
+          <svg class="animate-spin w-7 h-7 text-fenalco-purple" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </div>
+
+        <div x-show="!reportesLoading">
+
+          <!-- Fila 1: Donut + Barras horizontales -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+            <!-- Distribución de cartera -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 class="font-semibold text-fenalco-purple">Distribución de cartera</h2>
+              <p class="text-xs text-fenalco-gray mt-0.5 mb-5">Estado actual de todos los afiliados</p>
+              <div class="relative h-56">
+                <canvas id="chartCartera"></canvas>
+              </div>
+            </div>
+
+            <!-- Mora por antigüedad -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 class="font-semibold text-fenalco-purple">Mora por antigüedad</h2>
+              <p class="text-xs text-fenalco-gray mt-0.5 mb-5">Afiliados en mora agrupados por días de atraso</p>
+              <div x-show="!reportes.moraRangos?.length" class="flex items-center justify-center h-56 text-fenalco-gray text-sm">
+                Sin afiliados en mora
+              </div>
+              <div x-show="reportes.moraRangos?.length" class="relative h-56">
+                <canvas id="chartMora"></canvas>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Fila 2: Línea interacciones -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <h2 class="font-semibold text-fenalco-purple">Actividad de contactos</h2>
+            <p class="text-xs text-fenalco-gray mt-0.5 mb-5">Interacciones registradas por mes — últimos 6 meses</p>
+            <div class="relative h-48">
+              <canvas id="chartInteracciones"></canvas>
+            </div>
+          </div>
+
+          <!-- Fila 3: Ranking ejecutivos -->
+          <div class="bg-white rounded-xl border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-100">
+              <h2 class="font-semibold text-fenalco-purple">Ranking de ejecutivos</h2>
+              <p class="text-xs text-fenalco-gray mt-0.5">Gestión de cartera por responsable asignado</p>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-left text-fenalco-gray text-xs uppercase tracking-wide border-b border-gray-100 bg-gray-50">
+                    <th class="px-6 py-3 font-medium w-8">#</th>
+                    <th class="px-6 py-3 font-medium">Ejecutivo</th>
+                    <th class="px-6 py-3 font-medium text-right">Asignados</th>
+                    <th class="px-6 py-3 font-medium text-right">En mora</th>
+                    <th class="px-6 py-3 font-medium text-right">Interacciones</th>
+                    <th class="px-6 py-3 font-medium text-right">Saldo gestionado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                  <template x-for="(ej, idx) in reportes.rankingEjecutivos || []" :key="ej._id || idx">
+                    <tr class="hover:bg-gray-50 transition-colors">
+                      <td class="px-6 py-4 text-fenalco-gray font-medium" x-text="idx + 1"></td>
+                      <td class="px-6 py-4">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-fenalco-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                            x-text="ej.nombre.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase()">
+                          </div>
+                          <span class="font-medium text-gray-800" x-text="ej.nombre"></span>
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 text-right">
+                        <span class="font-bold text-fenalco-purple" x-text="ej.asignados"></span>
+                      </td>
+                      <td class="px-6 py-4 text-right">
+                        <span x-show="ej.enMora > 0"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+                          x-text="ej.enMora"></span>
+                        <span x-show="ej.enMora === 0" class="text-fenalco-gray">—</span>
+                      </td>
+                      <td class="px-6 py-4 text-right text-gray-700" x-text="ej.totalInteracciones"></td>
+                      <td class="px-6 py-4 text-right font-mono text-xs"
+                        :class="ej.saldoGestionado > 0 ? 'text-red-600 font-semibold' : 'text-fenalco-gray'"
+                        x-text="fmtPeso(ej.saldoGestionado)">
+                      </td>
+                    </tr>
+                  </template>
+                  <tr x-show="!(reportes.rankingEjecutivos || []).length">
+                    <td colspan="6" class="px-6 py-10 text-center text-fenalco-gray text-sm">Sin ejecutivos asignados</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -415,13 +524,19 @@
         sidebarOpen: false,
         activePage: 'dashboard',
 
-        // datos
+        // datos dashboard
         loading: true,
         error: '',
         stats: { total: 0, al_dia: 0, en_mora: 0, acuerdo_pago: 0 },
         recientes: [],
         moraCritica: [],
         alertaDismissed: false,
+
+        // datos reportes
+        reportesLoading: false,
+        reportesLoaded: false,
+        reportes: { distribucionCartera: [], moraRangos: [], interaccionesPorMes: [], rankingEjecutivos: [] },
+        _charts: {},
 
         get navItems() {
           const all = [
@@ -444,6 +559,11 @@
               id: 'reportes',
               label: 'Reportes',
               icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+            },
+            {
+              id: 'ejecutivos',
+              label: 'Ejecutivos',
+              icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>',
             },
             {
               id: 'usuarios',
@@ -491,11 +611,18 @@
         },
 
         setPage(id) {
-          if (id === 'afiliados') { window.location.href = '/afiliados.html'; return; }
-          if (id === 'cartera')   { window.location.href = '/cartera.html';   return; }
-          if (id === 'usuarios')  { window.location.href = '/usuarios.html';  return; }
+          if (id === 'afiliados')  { window.location.href = '/afiliados.html';  return; }
+          if (id === 'cartera')    { window.location.href = '/cartera.html';    return; }
+          if (id === 'usuarios')   { window.location.href = '/usuarios.html';   return; }
+          if (id === 'ejecutivos') { window.location.href = '/ejecutivos.html'; return; }
           this.activePage = id;
           this.sidebarOpen = false;
+          if (id === 'reportes') {
+            this.$nextTick(() => {
+              if (!this.reportesLoaded) this.fetchReportes();
+              else this.renderCharts();
+            });
+          }
         },
 
         estadoBadge(estado) {
@@ -520,6 +647,130 @@
             acuerdo_pago: { label: 'Acuerdo de pago', dot: 'bg-amber-400', cls: 'bg-amber-50 text-amber-700' },
           };
           return map[cartera] || { label: cartera, dot: 'bg-gray-400', cls: 'bg-gray-100 text-gray-500' };
+        },
+
+        async fetchReportes() {
+          this.reportesLoading = true;
+          try {
+            const res = await fetch('/api/afiliados/reportes', {
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.status === 401) { this.logout(); return; }
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            this.reportes = data;
+            this.reportesLoaded = true;
+            await this.$nextTick();
+            this.renderCharts();
+          } catch {
+            // error silencioso — los charts quedan vacíos
+          } finally {
+            this.reportesLoading = false;
+          }
+        },
+
+        renderCharts() {
+          this.renderChartCartera();
+          this.renderChartMora();
+          this.renderChartInteracciones();
+        },
+
+        renderChartCartera() {
+          const el = document.getElementById('chartCartera');
+          if (!el) return;
+          if (this._charts.cartera) this._charts.cartera.destroy();
+          const colorMap = { al_dia: '#00CE7C', en_mora: '#EF4444', acuerdo_pago: '#F59E0B', suspendido: '#9CA3AF' };
+          const labelMap = { al_dia: 'Al día', en_mora: 'En mora', acuerdo_pago: 'Acuerdo de pago', suspendido: 'Suspendido' };
+          const dist = this.reportes.distribucionCartera || [];
+          this._charts.cartera = new Chart(el, {
+            type: 'doughnut',
+            data: {
+              labels: dist.map(d => labelMap[d._id] || d._id),
+              datasets: [{
+                data: dist.map(d => d.count),
+                backgroundColor: dist.map(d => colorMap[d._id] || '#9CA3AF'),
+                borderWidth: 3, borderColor: '#fff',
+              }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '65%',
+              plugins: {
+                legend: { position: 'right', labels: { font: { size: 11 }, padding: 14, boxWidth: 12 } },
+                tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} afiliados` } },
+              },
+            },
+          });
+        },
+
+        renderChartMora() {
+          const el = document.getElementById('chartMora');
+          if (!el) return;
+          if (this._charts.mora) this._charts.mora.destroy();
+          const rangoLabel = { 1: '1 – 30 días', 31: '31 – 60 días', 61: '61 – 90 días', '91+': '91 + días' };
+          const rangoColor = { 1: '#FCD34D', 31: '#FB923C', 61: '#EF4444', '91+': '#991B1B' };
+          const rangos = this.reportes.moraRangos || [];
+          this._charts.mora = new Chart(el, {
+            type: 'bar',
+            data: {
+              labels: rangos.map(r => rangoLabel[r._id] || r._id),
+              datasets: [{
+                label: 'Afiliados',
+                data: rangos.map(r => r.count),
+                backgroundColor: rangos.map(r => rangoColor[r._id] || '#EF4444'),
+                borderRadius: 6, borderSkipped: false,
+              }],
+            },
+            options: {
+              indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => ` ${c.raw} afiliados` } },
+              },
+              scales: {
+                x: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 11 }, color: '#6B7280', precision: 0 } },
+                y: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#374151' } },
+              },
+            },
+          });
+        },
+
+        renderChartInteracciones() {
+          const el = document.getElementById('chartInteracciones');
+          if (!el) return;
+          if (this._charts.interacciones) this._charts.interacciones.destroy();
+          const now = new Date();
+          const meses = Array.from({ length: 6 }, (_, i) => {
+            const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+            return { year: d.getFullYear(), month: d.getMonth() + 1, label: d.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' }) };
+          });
+          const dataMap = {};
+          (this.reportes.interaccionesPorMes || []).forEach(item => {
+            dataMap[`${item._id.year}-${item._id.month}`] = item.count;
+          });
+          this._charts.interacciones = new Chart(el, {
+            type: 'line',
+            data: {
+              labels: meses.map(m => m.label),
+              datasets: [{
+                label: 'Interacciones',
+                data: meses.map(m => dataMap[`${m.year}-${m.month}`] || 0),
+                borderColor: '#280071', backgroundColor: 'rgba(40,0,113,0.07)',
+                fill: true, tension: 0.4,
+                pointBackgroundColor: '#280071', pointRadius: 4, pointHoverRadius: 6, borderWidth: 2,
+              }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => ` ${c.raw} interacciones` } },
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#6B7280' } },
+                y: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 11 }, color: '#6B7280', precision: 0 }, beginAtZero: true },
+              },
+            },
+          });
         },
 
         logout() {
