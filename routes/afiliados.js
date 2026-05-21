@@ -227,6 +227,165 @@ router.get('/cartera/export/excel', protect, async (req, res) => {
   }
 });
 
+// GET /api/afiliados/reportes
+router.get('/reportes', protect, async (req, res) => {
+  try {
+    const seisAtras = new Date();
+    seisAtras.setMonth(seisAtras.getMonth() - 5);
+    seisAtras.setDate(1);
+    seisAtras.setHours(0, 0, 0, 0);
+
+    const [distribucionCartera, moraRangos, interaccionesPorMes, rankingEjecutivos] = await Promise.all([
+
+      Afiliado.aggregate([
+        { $group: { _id: '$estadoCartera', count: { $sum: 1 } } },
+      ]),
+
+      Afiliado.aggregate([
+        { $match: { diasMora: { $gt: 0 } } },
+        { $bucket: {
+          groupBy: '$diasMora',
+          boundaries: [1, 31, 61, 91],
+          default: '91+',
+          output: { count: { $sum: 1 }, monto: { $sum: '$saldoPendiente' } },
+        }},
+      ]),
+
+      Afiliado.aggregate([
+        { $unwind: '$interacciones' },
+        { $match: { 'interacciones.fecha': { $gte: seisAtras } } },
+        { $group: {
+          _id: { year: { $year: '$interacciones.fecha' }, month: { $month: '$interacciones.fecha' } },
+          count: { $sum: 1 },
+        }},
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+      ]),
+
+      Afiliado.aggregate([
+        { $group: {
+          _id: '$ejecutivoAsignado',
+          asignados: { $sum: 1 },
+          enMora: { $sum: { $cond: [{ $eq: ['$estadoCartera', 'en_mora'] }, 1, 0] } },
+          saldoGestionado: { $sum: '$saldoPendiente' },
+          totalInteracciones: { $sum: { $size: { $ifNull: ['$interacciones', []] } } },
+        }},
+        { $match: { _id: { $ne: null } } },
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'ejecutivo' } },
+        { $unwind: { path: '$ejecutivo', preserveNullAndEmptyArrays: true } },
+        { $project: {
+          nombre: { $ifNull: ['$ejecutivo.nombre', 'Sin asignar'] },
+          asignados: 1, enMora: 1, saldoGestionado: 1, totalInteracciones: 1,
+        }},
+        { $sort: { asignados: -1 } },
+        { $limit: 10 },
+      ]),
+    ]);
+
+    res.json({ success: true, distribucionCartera, moraRangos, interaccionesPorMes, rankingEjecutivos });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al generar reportes', error: error.message });
+  }
+});
+
+// GET /api/afiliados/ejecutivos/rendimiento
+router.get('/ejecutivos/rendimiento', protect, async (req, res) => {
+  try {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const rendimiento = await Afiliado.aggregate([
+      {
+        $group: {
+          _id: '$ejecutivoAsignado',
+          asignados: { $sum: 1 },
+          enMora: { $sum: { $cond: [{ $eq: ['$estadoCartera', 'en_mora'] }, 1, 0] } },
+          acuerdoPago: { $sum: { $cond: [{ $eq: ['$estadoCartera', 'acuerdo_pago'] }, 1, 0] } },
+          saldoGestionado: { $sum: '$saldoPendiente' },
+          totalInteracciones: { $sum: { $size: { $ifNull: ['$interacciones', []] } } },
+          interaccionesLlamada: { $sum: { $size: { $filter: { input: { $ifNull: ['$interacciones', []] }, as: 'i', cond: { $eq: ['$$i.tipo', 'llamada'] } } } } },
+          interaccionesEmail: { $sum: { $size: { $filter: { input: { $ifNull: ['$interacciones', []] }, as: 'i', cond: { $eq: ['$$i.tipo', 'email'] } } } } },
+          interaccionesReunion: { $sum: { $size: { $filter: { input: { $ifNull: ['$interacciones', []] }, as: 'i', cond: { $eq: ['$$i.tipo', 'reunion'] } } } } },
+          interaccionesWhatsapp: { $sum: { $size: { $filter: { input: { $ifNull: ['$interacciones', []] }, as: 'i', cond: { $eq: ['$$i.tipo', 'whatsapp'] } } } } },
+          interaccionesVisita: { $sum: { $size: { $filter: { input: { $ifNull: ['$interacciones', []] }, as: 'i', cond: { $eq: ['$$i.tipo', 'visita'] } } } } },
+          totalCompromisos: { $sum: { $size: { $ifNull: ['$compromisos', []] } } },
+          compromisosCumplidos: { $sum: { $size: { $filter: { input: { $ifNull: ['$compromisos', []] }, as: 'c', cond: { $eq: ['$$c.cumplido', true] } } } } },
+          compromisosVencidos: { $sum: { $size: { $filter: { input: { $ifNull: ['$compromisos', []] }, as: 'c', cond: { $and: [{ $eq: ['$$c.cumplido', false] }, { $lt: ['$$c.fechaCompromiso', hoy] }] } } } } },
+          compromisosPendientes: { $sum: { $size: { $filter: { input: { $ifNull: ['$compromisos', []] }, as: 'c', cond: { $and: [{ $eq: ['$$c.cumplido', false] }, { $gte: ['$$c.fechaCompromiso', hoy] }] } } } } },
+        },
+      },
+      { $match: { _id: { $ne: null } } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'ejecutivo' } },
+      { $unwind: { path: '$ejecutivo', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          nombre: { $ifNull: ['$ejecutivo.nombre', 'Sin asignar'] },
+          email: { $ifNull: ['$ejecutivo.email', ''] },
+          role: { $ifNull: ['$ejecutivo.role', ''] },
+          asignados: 1, enMora: 1, acuerdoPago: 1, saldoGestionado: 1,
+          totalInteracciones: 1,
+          interaccionesLlamada: 1, interaccionesEmail: 1, interaccionesReunion: 1,
+          interaccionesWhatsapp: 1, interaccionesVisita: 1,
+          totalCompromisos: 1, compromisosCumplidos: 1, compromisosVencidos: 1, compromisosPendientes: 1,
+        },
+      },
+      { $sort: { totalInteracciones: -1 } },
+    ]);
+
+    res.json({ rendimiento });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al obtener rendimiento', error: err.message });
+  }
+});
+
+// POST /api/afiliados — Crear nuevo afiliado
+router.post('/', protect, async (req, res) => {
+  const {
+    razonSocial, nit, sector, subsector, tamano,
+    estado, estadoCartera, fechaAfiliacion, fechaVencimiento,
+    valorMembresia, cuotaMensual, saldoPendiente, diasMora,
+    ejecutivoAsignado, direccion, email, telefono, notas,
+  } = req.body;
+
+  if (!razonSocial || !nit)
+    return res.status(400).json({ message: 'Razón social y NIT son obligatorios' });
+
+  try {
+    const existe = await Afiliado.findOne({ nit });
+    if (existe)
+      return res.status(400).json({ message: 'El NIT ya está registrado' });
+
+    const contactos = (email || telefono)
+      ? [{ nombre: razonSocial, email: email || '', telefono: telefono || '', esPrincipal: true }]
+      : [];
+
+    const afiliado = await Afiliado.create({
+      razonSocial,
+      nit,
+      sector,
+      subsector,
+      tamano,
+      estado:           estado           || 'activo',
+      estadoCartera:    estadoCartera    || 'al_dia',
+      fechaAfiliacion:  fechaAfiliacion  ? new Date(fechaAfiliacion) : undefined,
+      fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : undefined,
+      valorMembresia:   valorMembresia   ? Number(valorMembresia)   : undefined,
+      cuotaMensual:     cuotaMensual     ? Number(cuotaMensual)     : undefined,
+      saldoPendiente:   saldoPendiente   ? Number(saldoPendiente)   : 0,
+      diasMora:         diasMora         ? Number(diasMora)         : 0,
+      ejecutivoAsignado: ejecutivoAsignado || undefined,
+      direccion,
+      contactos,
+      notas,
+    });
+
+    res.status(201).json({ success: true, message: 'Afiliado creado correctamente', afiliado });
+  } catch (error) {
+    if (error.code === 11000)
+      return res.status(400).json({ message: 'El NIT ya está registrado' });
+    res.status(500).json({ message: 'Error al crear afiliado', error: error.message });
+  }
+});
+
 // GET /api/afiliados/:id
 router.get('/:id', protect, async (req, res) => {
   try {
@@ -364,6 +523,76 @@ router.put('/:id', protect, async (req, res) => {
   } catch (error) {
     if (error.code === 11000) return res.status(400).json({ message: 'El NIT ya está registrado para otro afiliado' });
     res.status(500).json({ message: 'Error al actualizar afiliado', error: error.message });
+  }
+});
+
+// ── GESTIÓN DE CONTACTOS ─────────────────────────────────────
+
+// POST /api/afiliados/:id/contactos
+router.post('/:id/contactos', protect, async (req, res) => {
+  const { nombre, cargo, email, telefono, esPrincipal } = req.body;
+  if (!nombre) return res.status(400).json({ message: 'El nombre es obligatorio' });
+  try {
+    const afiliado = await Afiliado.findById(req.params.id);
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+    if (esPrincipal) afiliado.contactos.forEach(c => { c.esPrincipal = false; });
+    afiliado.contactos.push({ nombre, cargo, email, telefono, esPrincipal: !!esPrincipal });
+    await afiliado.save();
+    const nuevo = afiliado.contactos[afiliado.contactos.length - 1];
+    res.status(201).json({ success: true, message: 'Contacto añadido', contacto: nuevo });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al añadir contacto', error: error.message });
+  }
+});
+
+// PUT /api/afiliados/:id/contactos/:cid
+router.put('/:id/contactos/:cid', protect, async (req, res) => {
+  const { nombre, cargo, email, telefono, esPrincipal } = req.body;
+  if (!nombre) return res.status(400).json({ message: 'El nombre es obligatorio' });
+  try {
+    const afiliado = await Afiliado.findById(req.params.id);
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+    const contacto = afiliado.contactos.id(req.params.cid);
+    if (!contacto) return res.status(404).json({ message: 'Contacto no encontrado' });
+    if (esPrincipal) afiliado.contactos.forEach(c => { c.esPrincipal = false; });
+    Object.assign(contacto, { nombre, cargo, email, telefono, esPrincipal: !!esPrincipal });
+    await afiliado.save();
+    res.json({ success: true, message: 'Contacto actualizado', contacto });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar contacto', error: error.message });
+  }
+});
+
+// DELETE /api/afiliados/:id/contactos/:cid
+router.delete('/:id/contactos/:cid', protect, async (req, res) => {
+  try {
+    const afiliado = await Afiliado.findById(req.params.id);
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+    const contacto = afiliado.contactos.id(req.params.cid);
+    if (!contacto) return res.status(404).json({ message: 'Contacto no encontrado' });
+    const eraPrincipal = contacto.esPrincipal;
+    afiliado.contactos.pull({ _id: req.params.cid });
+    if (eraPrincipal && afiliado.contactos.length > 0) afiliado.contactos[0].esPrincipal = true;
+    await afiliado.save();
+    res.json({ success: true, message: 'Contacto eliminado' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar contacto', error: error.message });
+  }
+});
+
+// PATCH /api/afiliados/:id/contactos/:cid/principal
+router.patch('/:id/contactos/:cid/principal', protect, async (req, res) => {
+  try {
+    const afiliado = await Afiliado.findById(req.params.id);
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+    const contacto = afiliado.contactos.id(req.params.cid);
+    if (!contacto) return res.status(404).json({ message: 'Contacto no encontrado' });
+    afiliado.contactos.forEach(c => { c.esPrincipal = false; });
+    contacto.esPrincipal = true;
+    await afiliado.save();
+    res.json({ success: true, message: 'Contacto principal actualizado' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar contacto principal', error: error.message });
   }
 });
 
