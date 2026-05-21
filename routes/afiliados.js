@@ -20,17 +20,22 @@ const buildSearch = (search) => {
 // GET /api/afiliados/stats
 router.get('/stats', protect, async (req, res) => {
   try {
-    const [totales, recientes] = await Promise.all([
+    const [totales, recientes, moraCritica] = await Promise.all([
       Afiliado.aggregate([{ $group: { _id: '$estadoCartera', count: { $sum: 1 } } }]),
       Afiliado.find()
         .sort({ createdAt: -1 })
         .limit(5)
         .select('razonSocial nit estado estadoCartera diasMora createdAt')
         .lean(),
+      Afiliado.find({ diasMora: { $gt: 60 } })
+        .sort({ diasMora: -1, saldoPendiente: -1 })
+        .limit(5)
+        .select('razonSocial nit diasMora saldoPendiente estadoCartera')
+        .lean(),
     ]);
     const stats = { total: 0, al_dia: 0, en_mora: 0, acuerdo_pago: 0 };
     totales.forEach(({ _id, count }) => { stats[_id] = count; stats.total += count; });
-    res.json({ success: true, stats, recientes });
+    res.json({ success: true, stats, recientes, moraCritica });
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener estadísticas', error: error.message });
   }

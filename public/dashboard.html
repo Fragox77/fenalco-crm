@@ -153,6 +153,37 @@
           <p class="text-fenalco-gray text-sm mt-0.5">Métricas de afiliados y cartera</p>
         </div>
 
+        <!-- Banner mora crítica -->
+        <div
+          x-show="!loading && moraCritica.length > 0 && !alertaDismissed"
+          x-transition:enter="transition duration-300"
+          x-transition:enter-start="opacity-0 -translate-y-2"
+          x-transition:enter-end="opacity-100 translate-y-0"
+          class="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5"
+        >
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+          </div>
+          <p class="text-sm text-red-700 flex-1">
+            <strong x-text="moraCritica.length"></strong>
+            <span x-text="moraCritica.length === 1 ? ' afiliado tiene' : ' afiliados tienen'"></span>
+            mora crítica (más de 60 días sin pago).
+            <a href="/cartera.html" class="font-semibold underline hover:text-red-900 ml-1">Ver cartera →</a>
+          </p>
+          <button
+            @click="alertaDismissed = true"
+            class="flex-shrink-0 p-1 rounded-lg text-red-400 hover:text-red-700 hover:bg-red-100 transition-colors"
+            title="Cerrar"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
         <!-- Tarjetas métricas -->
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
 
@@ -284,6 +315,56 @@
           </div>
         </div>
 
+        <!-- Tabla mora crítica -->
+        <div
+          x-show="!loading && moraCritica.length > 0"
+          class="mt-6 bg-white rounded-xl border border-red-200"
+        >
+          <div class="flex items-center gap-3 px-6 py-4 border-b border-red-100">
+            <span class="inline-flex w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <h2 class="font-semibold text-gray-800">
+              Mora crítica
+              <span class="text-red-500 font-normal text-sm ml-1">&gt; 60 días</span>
+            </h2>
+            <span
+              class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+              x-text="moraCritica.length"
+            ></span>
+            <a href="/cartera.html" class="ml-auto text-xs text-fenalco-blue hover:underline font-medium">
+              Ver todos →
+            </a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-fenalco-gray text-xs uppercase tracking-wide border-b border-gray-100">
+                  <th class="px-6 py-3 font-medium">Razón social</th>
+                  <th class="px-6 py-3 font-medium">NIT</th>
+                  <th class="px-6 py-3 font-medium text-right">Días mora</th>
+                  <th class="px-6 py-3 font-medium text-right">Saldo pendiente</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                <template x-for="a in moraCritica" :key="a._id">
+                  <tr class="hover:bg-red-50/50 transition-colors">
+                    <td class="px-6 py-3.5 font-medium text-gray-800" x-text="a.razonSocial"></td>
+                    <td class="px-6 py-3.5 text-fenalco-gray font-mono text-xs" x-text="a.nit"></td>
+                    <td class="px-6 py-3.5 text-right">
+                      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4m0 4h.01" />
+                        </svg>
+                        <span x-text="a.diasMora + ' días'"></span>
+                      </span>
+                    </td>
+                    <td class="px-6 py-3.5 text-right font-semibold text-red-600" x-text="fmtPeso(a.saldoPendiente)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
       <!-- ── PÁGINA: AFILIADOS ── -->
@@ -339,29 +420,40 @@
         error: '',
         stats: { total: 0, al_dia: 0, en_mora: 0, acuerdo_pago: 0 },
         recientes: [],
+        moraCritica: [],
+        alertaDismissed: false,
 
-        navItems: [
-          {
-            id: 'dashboard',
-            label: 'Dashboard',
-            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>',
-          },
-          {
-            id: 'afiliados',
-            label: 'Afiliados',
-            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
-          },
-          {
-            id: 'cartera',
-            label: 'Cartera',
-            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>',
-          },
-          {
-            id: 'reportes',
-            label: 'Reportes',
-            icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
-          },
-        ],
+        get navItems() {
+          const all = [
+            {
+              id: 'dashboard',
+              label: 'Dashboard',
+              icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>',
+            },
+            {
+              id: 'afiliados',
+              label: 'Afiliados',
+              icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+            },
+            {
+              id: 'cartera',
+              label: 'Cartera',
+              icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>',
+            },
+            {
+              id: 'reportes',
+              label: 'Reportes',
+              icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+            },
+            {
+              id: 'usuarios',
+              label: 'Usuarios',
+              adminOnly: true,
+              icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+            },
+          ];
+          return all.filter(i => !i.adminOnly || this.role === 'admin');
+        },
 
         get iniciales() {
           return this.nombre
@@ -390,6 +482,7 @@
             const data = await res.json();
             this.stats = data.stats;
             this.recientes = data.recientes;
+            this.moraCritica = data.moraCritica || [];
           } catch (err) {
             this.error = 'No se pudieron cargar las estadísticas';
           } finally {
@@ -400,6 +493,7 @@
         setPage(id) {
           if (id === 'afiliados') { window.location.href = '/afiliados.html'; return; }
           if (id === 'cartera')   { window.location.href = '/cartera.html';   return; }
+          if (id === 'usuarios')  { window.location.href = '/usuarios.html';  return; }
           this.activePage = id;
           this.sidebarOpen = false;
         },
@@ -412,6 +506,11 @@
             retirado:  { label: 'Retirado',  cls: 'bg-red-100 text-red-600' },
           };
           return map[estado] || { label: estado, cls: 'bg-gray-100 text-gray-500' };
+        },
+
+        fmtPeso(n) {
+          if (!n) return '$ 0';
+          return '$ ' + Number(n).toLocaleString('es-CO');
         },
 
         carteraBadge(cartera) {
