@@ -5,8 +5,6 @@ const contactoSchema = new mongoose.Schema({
   cargo: { type: String, trim: true },
   email: { type: String, trim: true, lowercase: true },
   telefono: { type: String, trim: true },
-  hora: { type: String, trim: true },
-  estadoTarea: { type: String, enum: ['pendiente', 'realizada', 'vencida'] },
   esPrincipal: { type: Boolean, default: false },
 });
 
