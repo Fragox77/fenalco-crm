@@ -607,16 +607,25 @@
           <div x-show="!historialData.compromisos || historialData.compromisos.length === 0"
             class="text-center py-4 text-fenalco-gray text-xs">Sin compromisos registrados</div>
           <div class="space-y-2">
-            <template x-for="(c, idx) in historialData.compromisos || []" :key="idx">
-              <div class="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
+            <template x-for="(c, idx) in historialData.compromisos || []" :key="c._id">
+              <div class="flex items-center justify-between rounded-lg px-3 py-2.5 border"
+                :class="c.cumplido ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'">
                 <div>
-                  <p class="text-sm font-semibold text-amber-800" x-text="fmtPeso(c.monto)"></p>
-                  <p class="text-xs text-amber-700 mt-0.5">Para el <span x-text="fmtFecha(c.fechaCompromiso)"></span></p>
-                  <p x-show="c.descripcion" class="text-xs text-amber-600 mt-0.5 italic" x-text="c.descripcion"></p>
+                  <p class="text-sm font-semibold" :class="c.cumplido ? 'text-green-800' : 'text-amber-800'" x-text="fmtPeso(c.monto)"></p>
+                  <p class="text-xs mt-0.5" :class="c.cumplido ? 'text-green-700' : 'text-amber-700'">Para el <span x-text="fmtFecha(c.fechaCompromiso)"></span></p>
+                  <p x-show="c.descripcion" class="text-xs mt-0.5 italic" :class="c.cumplido ? 'text-green-600' : 'text-amber-600'" x-text="c.descripcion"></p>
                 </div>
-                <span :class="c.cumplido ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
-                  class="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0"
-                  x-text="c.cumplido ? 'Cumplido' : 'Pendiente'"></span>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <span :class="c.cumplido ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+                    class="text-xs font-medium px-2 py-0.5 rounded-full"
+                    x-text="c.cumplido ? 'Cumplido' : 'Pendiente'"></span>
+                  <button x-show="!c.cumplido"
+                    @click="cumplirCompromiso(historialData._id, c._id, c)"
+                    title="Marcar como cumplido"
+                    class="w-6 h-6 flex items-center justify-center rounded-full bg-green-100 hover:bg-green-200 text-green-700 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  </button>
+                </div>
               </div>
             </template>
           </div>
@@ -838,6 +847,16 @@
         changePage(n) {
           if (n < 1 || n > this.totalPages) return;
           this.page = n; this.fetchCartera();
+        },
+
+        async cumplirCompromiso(afiliadoId, compromisoId, obj) {
+          try {
+            const res = await fetch(`/api/afiliados/${afiliadoId}/compromisos/${compromisoId}`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) obj.cumplido = true;
+          } catch {}
         },
 
         async exportar(formato) {

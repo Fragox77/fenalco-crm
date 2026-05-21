@@ -287,6 +287,21 @@ router.post('/:id/compromiso', protect, async (req, res) => {
   }
 });
 
+// PATCH /api/afiliados/:id/compromisos/:compromisoId
+router.patch('/:id/compromisos/:compromisoId', protect, async (req, res) => {
+  try {
+    const result = await Afiliado.updateOne(
+      { _id: req.params.id, 'compromisos._id': req.params.compromisoId },
+      { $set: { 'compromisos.$.cumplido': true } }
+    );
+    if (result.matchedCount === 0)
+      return res.status(404).json({ message: 'Compromiso no encontrado' });
+    res.json({ success: true, message: 'Compromiso marcado como cumplido' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al actualizar', error: err.message });
+  }
+});
+
 // GET /api/afiliados/:id/interacciones — historial completo sin límite de 10
 router.get('/:id/interacciones', protect, async (req, res) => {
   try {

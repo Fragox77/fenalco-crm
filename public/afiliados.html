@@ -501,16 +501,25 @@
           </div>
 
           <div class="space-y-2">
-            <template x-for="(c, idx) in ficha.compromisos || []" :key="idx">
-              <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+            <template x-for="(c, idx) in ficha.compromisos || []" :key="c._id">
+              <div class="p-3 rounded-lg border"
+                :class="c.cumplido ? 'bg-green-50 border-green-100' : (new Date(c.fechaCompromiso) < new Date() ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100')">
                 <div class="flex items-center justify-between gap-2 flex-wrap">
                   <span class="text-sm font-bold text-fenalco-purple" x-text="fmtPeso(c.monto)"></span>
-                  <span class="text-xs font-medium px-2 py-0.5 rounded-full"
-                    :class="c.cumplido
-                      ? 'bg-green-100 text-green-700'
-                      : (new Date(c.fechaCompromiso) < new Date() ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700')"
-                    x-text="c.cumplido ? 'Cumplido' : (new Date(c.fechaCompromiso) < new Date() ? 'Vencido' : 'Pendiente')">
-                  </span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-full"
+                      :class="c.cumplido
+                        ? 'bg-green-100 text-green-700'
+                        : (new Date(c.fechaCompromiso) < new Date() ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700')"
+                      x-text="c.cumplido ? 'Cumplido' : (new Date(c.fechaCompromiso) < new Date() ? 'Vencido' : 'Pendiente')">
+                    </span>
+                    <button x-show="!c.cumplido"
+                      @click="cumplirCompromiso(ficha._id, c._id, c)"
+                      title="Marcar como cumplido"
+                      class="w-6 h-6 flex items-center justify-center rounded-full bg-green-100 hover:bg-green-200 text-green-700 transition-colors flex-shrink-0">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <p class="text-xs text-fenalco-gray mt-1">
                   Fecha comprometida: <span class="font-medium text-gray-700" x-text="fmtFecha(c.fechaCompromiso)"></span>
@@ -1149,6 +1158,16 @@
         changePage(n) {
           if (n < 1 || n > this.totalPages) return;
           this.page = n; this.fetchAfiliados();
+        },
+
+        async cumplirCompromiso(afiliadoId, compromisoId, obj) {
+          try {
+            const res = await fetch(`/api/afiliados/${afiliadoId}/compromisos/${compromisoId}`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) obj.cumplido = true;
+          } catch {}
         },
 
         async exportar(formato) {
