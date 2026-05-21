@@ -22,6 +22,8 @@
     }
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 
 <body class="bg-[#f5f5f5] min-h-screen" x-data="carteraApp()" x-init="init()">
@@ -95,9 +97,36 @@
     <main class="flex-1 px-4 lg:px-8 py-8 space-y-6">
 
       <!-- Título -->
-      <div>
-        <h1 class="text-xl font-bold text-fenalco-purple">Gestión de Cartera</h1>
-        <p class="text-fenalco-gray text-sm mt-0.5">Control de mora, acuerdos y compromisos de pago</p>
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold text-fenalco-purple">Gestión de Cartera</h1>
+          <p class="text-fenalco-gray text-sm mt-0.5">Control de mora, acuerdos y compromisos de pago</p>
+        </div>
+        <div class="relative" x-data="{ exportOpen: false }">
+          <button @click="exportOpen = !exportOpen" @click.outside="exportOpen = false"
+            :disabled="exportLoading"
+            class="flex items-center gap-1.5 border border-gray-300 text-fenalco-gray text-sm font-medium px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg x-show="!exportLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            <svg x-show="exportLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            <span x-text="exportLoading ? 'Exportando…' : 'Exportar'"></span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div x-show="exportOpen"
+            x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-75"  x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+            <button @click="exportar('excel'); exportOpen = false"
+              class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">
+              <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1v5h5l-5-5zM8 13h8v1H8v-1zm0 2h8v1H8v-1zm0 2h5v1H8v-1z"/></svg>
+              Excel (.xlsx)
+            </button>
+            <button @click="exportar('pdf'); exportOpen = false"
+              class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">
+              <svg class="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1v5h5l-5-5zM9 13h1.5c.8 0 1.5.7 1.5 1.5S11.3 16 10.5 16H10v1H9v-4zm1 2h.5c.3 0 .5-.2.5-.5s-.2-.5-.5-.5H10v1z"/></svg>
+              PDF (.pdf)
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- ── SECCIÓN 1: TARJETAS RESUMEN ────────────────────── -->
@@ -681,6 +710,9 @@
         compromisoForm: { fechaCompromiso: '', monto: '', descripcion: '' },
         compromisoErrors: {}, compromisoLoading: false, compromisoError: '', compromisoSuccess: false,
 
+        // exportar
+        exportLoading: false,
+
         // panel historial
         modalHistorial: false,
         historialData: {},
@@ -806,6 +838,61 @@
         changePage(n) {
           if (n < 1 || n > this.totalPages) return;
           this.page = n; this.fetchCartera();
+        },
+
+        async exportar(formato) {
+          this.exportLoading = true;
+          try {
+            const params = new URLSearchParams();
+            if (this.search)        params.set('search', this.search);
+            if (this.filtroCartera) params.set('estadoCartera', this.filtroCartera);
+            if (this.filtroRango)   params.set('rangoDias', this.filtroRango);
+
+            if (formato === 'excel') {
+              const res = await fetch(`/api/afiliados/cartera/export/excel?${params}`, {
+                headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+              });
+              if (!res.ok) throw new Error('Error al exportar');
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = 'cartera.xlsx';
+              document.body.appendChild(a); a.click(); document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } else {
+              params.set('limit', '9999');
+              const res = await fetch(`/api/afiliados/cartera/lista?${params}`, {
+                headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+              });
+              const data = await res.json();
+              const { jsPDF } = window.jspdf;
+              const doc = new jsPDF({ orientation: 'landscape', unit: 'mm' });
+              const hoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+              doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 0, 113);
+              doc.text('Fenalco — Gestión de Cartera', 14, 14);
+              doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(72, 73, 84);
+              doc.text(`Generado: ${hoy}  ·  Total: ${data.afiliados.length} registros`, 14, 20);
+              const carteraLabel = { al_dia: 'Al día', en_mora: 'En mora', acuerdo_pago: 'Acuerdo pago', suspendido: 'Suspendido' };
+              const fmt = v => v ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v) : '$0';
+              doc.autoTable({
+                startY: 25,
+                head: [['Razón social', 'NIT', 'Estado cartera', 'Días mora', 'Saldo pendiente', 'Vencimiento', 'Ejecutivo']],
+                body: data.afiliados.map(a => [
+                  a.razonSocial, a.nit,
+                  carteraLabel[a.estadoCartera] || a.estadoCartera,
+                  a.diasMora || 0, fmt(a.saldoPendiente),
+                  a.fechaVencimiento ? new Date(a.fechaVencimiento).toLocaleDateString('es-CO') : '—',
+                  a.ejecutivoAsignado?.nombre || '—',
+                ]),
+                styles: { fontSize: 7, cellPadding: 2 },
+                headStyles: { fillColor: [40, 0, 113], textColor: 255, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 28 }, 3: { halign: 'center' }, 4: { halign: 'right' } },
+              });
+              doc.save('cartera.pdf');
+            }
+          } catch (err) { console.error('exportar:', err); }
+          finally { this.exportLoading = false; }
         },
 
         // ── helpers visuales ──────────────────────────────

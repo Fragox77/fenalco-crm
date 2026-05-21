@@ -134,6 +134,94 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// GET /api/afiliados/export/excel
+router.get('/export/excel', protect, async (req, res) => {
+  try {
+    const xlsx = require('xlsx');
+    const { search, estadoCartera, estado } = req.query;
+    const filter = {};
+    if (estadoCartera) filter.estadoCartera = estadoCartera;
+    if (estado)        filter.estado = estado;
+    if (search)        Object.assign(filter, buildSearch(search));
+
+    const afiliados = await Afiliado.find(filter)
+      .populate('ejecutivoAsignado', 'nombre')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const carteraLabel = { al_dia: 'Al día', en_mora: 'En mora', acuerdo_pago: 'Acuerdo de pago', suspendido: 'Suspendido' };
+    const rows = afiliados.map(a => ({
+      'Razón social':    a.razonSocial,
+      'NIT':             a.nit,
+      'Sector':          a.sector || '',
+      'Tamaño':          a.tamano ? a.tamano.charAt(0).toUpperCase() + a.tamano.slice(1) : '',
+      'Estado':          a.estado,
+      'Cartera':         carteraLabel[a.estadoCartera] || a.estadoCartera,
+      'Días mora':       a.diasMora || 0,
+      'Saldo pendiente': a.saldoPendiente || 0,
+      'Ciudad':          a.direccion?.ciudad || '',
+      'Ejecutivo':       a.ejecutivoAsignado?.nombre || '',
+    }));
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet(rows);
+    xlsx.utils.book_append_sheet(wb, ws, 'Afiliados');
+    const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=afiliados.xlsx');
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ message: 'Error al exportar', error: err.message });
+  }
+});
+
+// GET /api/afiliados/cartera/export/excel
+router.get('/cartera/export/excel', protect, async (req, res) => {
+  try {
+    const xlsx = require('xlsx');
+    const { search, estadoCartera, rangoDias } = req.query;
+
+    const conditions = [];
+    if (estadoCartera) {
+      conditions.push({ estadoCartera });
+    } else {
+      conditions.push({ $or: [{ saldoPendiente: { $gt: 0 } }, { estadoCartera: { $in: ['en_mora', 'acuerdo_pago', 'suspendido'] } }] });
+    }
+    if (rangoDias === '0-30')  conditions.push({ diasMora: { $gte: 1, $lte: 30 } });
+    if (rangoDias === '31-60') conditions.push({ diasMora: { $gte: 31, $lte: 60 } });
+    if (rangoDias === '61+')   conditions.push({ diasMora: { $gt: 60 } });
+    if (search) conditions.push(buildSearch(search));
+
+    const filter = conditions.length > 1 ? { $and: conditions } : conditions[0] || {};
+
+    const afiliados = await Afiliado.find(filter)
+      .populate('ejecutivoAsignado', 'nombre')
+      .sort({ diasMora: -1, saldoPendiente: -1 })
+      .lean();
+
+    const carteraLabel = { al_dia: 'Al día', en_mora: 'En mora', acuerdo_pago: 'Acuerdo de pago', suspendido: 'Suspendido' };
+    const rows = afiliados.map(a => ({
+      'Razón social':      a.razonSocial,
+      'NIT':               a.nit,
+      'Estado cartera':    carteraLabel[a.estadoCartera] || a.estadoCartera,
+      'Días mora':         a.diasMora || 0,
+      'Saldo pendiente':   a.saldoPendiente || 0,
+      'Fecha vencimiento': a.fechaVencimiento ? new Date(a.fechaVencimiento).toLocaleDateString('es-CO') : '',
+      'Ejecutivo':         a.ejecutivoAsignado?.nombre || '',
+    }));
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet(rows);
+    xlsx.utils.book_append_sheet(wb, ws, 'Cartera');
+    const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=cartera.xlsx');
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ message: 'Error al exportar', error: err.message });
+  }
+});
+
 // GET /api/afiliados/:id
 router.get('/:id', protect, async (req, res) => {
   try {
