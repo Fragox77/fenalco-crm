@@ -96,6 +96,50 @@ router.get('/usuarios', protect, async (req, res) => {
   }
 });
 
+// GET /api/auth/admin/usuarios — lista completa (admin)
+router.get('/admin/usuarios', protect, authorize('admin'), async (req, res) => {
+  try {
+    const usuarios = await User.find().select('-password').sort({ createdAt: -1 }).lean();
+    res.json({ success: true, usuarios });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/auth/admin/usuarios/:id — actualizar usuario (admin)
+router.put('/admin/usuarios/:id', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { nombre, email, role, activo } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+    if (nombre !== undefined) user.nombre = nombre;
+    if (email  !== undefined) user.email  = email;
+    if (role   !== undefined) user.role   = role;
+    if (activo !== undefined) user.activo = activo;
+    await user.save();
+    res.json({ success: true, message: 'Usuario actualizado' });
+  } catch (err) {
+    if (err.code === 11000) return res.status(400).json({ message: 'El email ya está en uso' });
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PATCH /api/auth/admin/usuarios/:id/password — resetear contraseña (admin)
+router.patch('/admin/usuarios/:id/password', protect, authorize('admin'), async (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 6)
+    return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+  try {
+    const user = await User.findById(req.params.id).select('+password');
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+    user.password = password;
+    await user.save();
+    res.json({ success: true, message: 'Contraseña actualizada' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // PUT /api/auth/cambiar-password
 router.put('/cambiar-password', protect, async (req, res) => {
   const { passwordActual, passwordNueva } = req.body;
