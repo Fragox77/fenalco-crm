@@ -199,6 +199,22 @@ router.post('/:id/compromiso', protect, async (req, res) => {
   }
 });
 
+// GET /api/afiliados/:id/interacciones — historial completo sin límite de 10
+router.get('/:id/interacciones', protect, async (req, res) => {
+  try {
+    const afiliado = await Afiliado.findById(req.params.id)
+      .select('razonSocial interacciones')
+      .populate('interacciones.ejecutivo', 'nombre')
+      .lean();
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+    const interacciones = (afiliado.interacciones || [])
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    res.json({ success: true, razonSocial: afiliado.razonSocial, interacciones });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // PUT /api/afiliados/:id
 router.put('/:id', protect, async (req, res) => {
   try {

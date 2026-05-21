@@ -404,20 +404,20 @@
             </button>
           </div>
 
-          <div x-show="!ficha.interacciones || ficha.interacciones.length === 0"
+          <div x-show="!((fichaInteracciones ?? ficha.interacciones) || []).length"
             class="text-center py-6 text-fenalco-gray text-xs">
             Sin registros de contacto aún
           </div>
 
           <div class="space-y-3">
-            <template x-for="(inter, idx) in ficha.interacciones || []" :key="idx">
+            <template x-for="(inter, idx) in (fichaInteracciones ?? ficha.interacciones) || []" :key="idx">
               <div class="flex gap-3">
                 <div class="flex flex-col items-center">
                   <div :class="tipoIcon(inter.tipo).bg"
                     class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
                     <span x-html="tipoIcon(inter.tipo).svg" class="w-3.5 h-3.5"></span>
                   </div>
-                  <div x-show="idx < (ficha.interacciones?.length || 0) - 1"
+                  <div x-show="idx < ((fichaInteracciones ?? ficha.interacciones)?.length || 0) - 1"
                     class="w-px flex-1 bg-gray-200 my-1"></div>
                 </div>
                 <div class="flex-1 pb-2">
@@ -435,6 +435,22 @@
               </div>
             </template>
           </div>
+
+          <!-- Ver historial completo / contador -->
+          <div x-show="(ficha.interacciones?.length || 0) >= 10 && fichaInteracciones === null"
+            class="mt-3 text-center">
+            <button @click="cargarHistorialCompleto()" :disabled="fichaInteraccionesLoading"
+              class="text-xs text-fenalco-blue hover:underline disabled:opacity-50 flex items-center gap-1.5 mx-auto">
+              <svg x-show="fichaInteraccionesLoading" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <span x-text="fichaInteraccionesLoading ? 'Cargando...' : 'Ver historial completo'"></span>
+            </button>
+          </div>
+          <p x-show="fichaInteracciones !== null"
+            class="text-xs text-center text-fenalco-gray mt-2"
+            x-text="(fichaInteracciones?.length || 0) + ' interacciones en total'"></p>
         </section>
 
       </div>
@@ -744,6 +760,8 @@
         modalFicha: false,
         fichaLoading: false,
         ficha: {},
+        fichaInteracciones: null,
+        fichaInteraccionesLoading: false,
 
         // modal contacto
         modalContacto: false,
@@ -802,6 +820,7 @@
           this.ficha = { ...a };
           this.modalFicha = true;
           this.fichaLoading = true;
+          this.fichaInteracciones = null;
           try {
             const res = await fetch(`/api/afiliados/${a._id}`, {
               headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
@@ -845,6 +864,16 @@
           } catch (err) {
             this.contactoError = err.message;
           } finally { this.contactoLoading = false; }
+        },
+
+        async cargarHistorialCompleto() {
+          this.fichaInteraccionesLoading = true;
+          try {
+            const res = await fetch(`/api/afiliados/${this.ficha._id}/interacciones`, {
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) { const d = await res.json(); this.fichaInteracciones = d.interacciones; }
+          } catch {} finally { this.fichaInteraccionesLoading = false; }
         },
 
         async openEdit(a) {
