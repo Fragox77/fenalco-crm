@@ -232,10 +232,14 @@
                   <td class="px-6 py-4 text-xs text-fenalco-gray" x-text="u.ultimoAcceso ? fmtFechaHora(u.ultimoAcceso) : 'Nunca'"></td>
                   <!-- Acciones -->
                   <td class="px-6 py-4">
-                    <div class="flex items-center justify-center">
+                    <div class="flex items-center justify-center gap-1">
                       <button @click="openEditar(u)" title="Editar"
                         class="p-1.5 rounded-lg text-fenalco-gray hover:text-fenalco-blue hover:bg-fenalco-blue/10 transition-colors">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                      </button>
+                      <button @click="confirmarEliminar(u)" title="Eliminar"
+                        class="p-1.5 rounded-lg text-fenalco-gray hover:text-red-600 hover:bg-red-50 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                       </button>
                     </div>
                   </td>
@@ -381,6 +385,51 @@
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════════
+       MODAL: CONFIRMAR ELIMINACIÓN
+  ══════════════════════════════════════════════════════════ -->
+  <div x-show="modalEliminar"
+    x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+    x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="modalEliminar = false"
+    @keydown.escape.window="modalEliminar = false">
+
+    <div x-show="modalEliminar"
+      x-transition:enter="transition-all duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+      x-transition:leave="transition-all duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4" @click.stop>
+
+      <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>
+        <div>
+          <h3 class="font-bold text-gray-800">Eliminar usuario</h3>
+          <p class="text-sm text-fenalco-gray mt-1">
+            ¿Eliminar a <span class="font-medium text-gray-800" x-text="eliminandoUser?.nombre"></span>? Esta acción no se puede deshacer.
+          </p>
+        </div>
+      </div>
+
+      <div x-show="eliminarError" class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
+        <span x-text="eliminarError"></span>
+      </div>
+
+      <div class="flex gap-3 justify-end">
+        <button @click="modalEliminar = false"
+          class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">
+          Cancelar
+        </button>
+        <button @click="eliminarUsuario" :disabled="eliminarLoading"
+          class="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors">
+          <svg x-show="eliminarLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+          <span x-text="eliminarLoading ? 'Eliminando…' : 'Sí, eliminar'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── SCRIPT ─────────────────────────────────────────────── -->
   <script>
     const NAV_ITEMS = [
@@ -416,6 +465,11 @@
         resetPassForm: { password: '' },
         resetPassLoading: false, resetPassError: '', resetPassSuccess: false,
         showResetPassText: false,
+
+        // eliminar usuario
+        modalEliminar: false,
+        eliminandoUser: null,
+        eliminarLoading: false, eliminarError: '',
 
         get filtrados() {
           return this.usuarios.filter(u => {
@@ -527,6 +581,31 @@
             this.resetPassError = err.message;
           } finally {
             this.resetPassLoading = false;
+          }
+        },
+
+        confirmarEliminar(u) {
+          this.eliminandoUser = u;
+          this.eliminarError = '';
+          this.modalEliminar = true;
+        },
+
+        async eliminarUsuario() {
+          this.eliminarLoading = true; this.eliminarError = '';
+          try {
+            const res = await fetch(`/api/auth/admin/usuarios/${this.eliminandoUser._id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al eliminar');
+            this.modalEliminar = false;
+            await this.fetchUsuarios();
+          } catch (err) {
+            this.eliminarError = err.message;
+          } finally {
+            this.eliminarLoading = false;
           }
         },
 

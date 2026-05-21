@@ -62,6 +62,15 @@ router.post('/login', async (req, res) => {
 router.post('/register', protect, authorize('admin'), async (req, res) => {
   const { nombre, email, password, role } = req.body;
 
+  if (!nombre || !email || !password) {
+    return res.status(400).json({ message: 'Nombre, email y contraseña son obligatorios' });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: 'El formato del email no es válido' });
+  }
+
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -69,7 +78,11 @@ router.post('/register', protect, authorize('admin'), async (req, res) => {
     }
 
     const user = await User.create({ nombre, email, password, role });
-    sendToken(user, 201, res);
+    res.status(201).json({
+      success: true,
+      message: 'Usuario creado correctamente',
+      user: { _id: user._id, nombre: user.nombre, email: user.email, role: user.role },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error al crear usuario', error: error.message });
   }
@@ -120,6 +133,20 @@ router.put('/admin/usuarios/:id', protect, authorize('admin'), async (req, res) 
     res.json({ success: true, message: 'Usuario actualizado' });
   } catch (err) {
     if (err.code === 11000) return res.status(400).json({ message: 'El email ya está en uso' });
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/auth/admin/usuarios/:id — eliminar usuario (admin)
+router.delete('/admin/usuarios/:id', protect, authorize('admin'), async (req, res) => {
+  try {
+    if (req.params.id === req.user._id.toString()) {
+      return res.status(400).json({ message: 'No puedes eliminar tu propia cuenta' });
+    }
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+    res.json({ success: true, message: 'Usuario eliminado correctamente' });
+  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });

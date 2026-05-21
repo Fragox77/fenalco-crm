@@ -12,12 +12,12 @@ const run = async () => {
     const user = new User({
       nombre: 'Administrador Fenalco',
       email: 'admin@fenalco.com',
-      password: 'admin123',
+      password: 'Admin123!',
       role: 'admin',
     });
 
     await user.save();
-    console.log('Admin creado: admin@fenalco.com / admin123');
+    console.log('Admin creado: admin@fenalco.com / Admin123!');
   } catch (err) {
     console.error('Error:', err.message);
   } finally {
