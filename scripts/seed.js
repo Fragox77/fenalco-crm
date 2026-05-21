@@ -6,6 +6,7 @@ const connectDB = require('../config/db');
 const SALT_ROUNDS = 10;
 
 const daysAgo = (n) => new Date(Date.now() - n * 864e5);
+const norm     = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const seed = async () => {
   await connectDB();
@@ -287,6 +288,8 @@ const seed = async () => {
         createdAt: daysAgo(800), updatedAt: daysAgo(30),
       },
     ];
+
+    afiliados.forEach(a => { a.razonSocialNorm = norm(a.razonSocial); });
 
     const afiliadosResult = await db.collection('afiliados').insertMany(afiliados);
     console.log(`${afiliadosResult.insertedCount} afiliados creados`);

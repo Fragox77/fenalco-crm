@@ -40,6 +40,7 @@ const afiliadoSchema = new mongoose.Schema(
       required: [true, 'La razón social es obligatoria'],
       trim: true,
     },
+    razonSocialNorm: { type: String, trim: true }, // versión sin tildes para búsqueda
     nit: {
       type: String,
       required: [true, 'El NIT es obligatorio'],
@@ -99,8 +100,16 @@ const afiliadoSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Índices con collation español strength:1 — ignoran tildes y mayúsculas en búsquedas
-afiliadoSchema.index({ razonSocial: 1 }, { collation: { locale: 'es', strength: 1 } });
-afiliadoSchema.index({ nit: 1 },         { collation: { locale: 'es', strength: 1 } });
+// razonSocialNorm se mantiene sincronizado automáticamente al guardar
+afiliadoSchema.pre('save', function () {
+  if (this.isModified('razonSocial') || !this.razonSocialNorm) {
+    this.razonSocialNorm = this.razonSocial
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase();
+  }
+});
+
+afiliadoSchema.index({ razonSocialNorm: 1 });
 
 module.exports = mongoose.model('Afiliado', afiliadoSchema);

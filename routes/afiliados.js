@@ -5,10 +5,17 @@ const { protect } = require('../middleware/auth');
 
 // ── helpers ───────────────────────────────────────────────────
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-// Quita tildes y diacríticos para búsqueda aproximada
-const normalize  = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
 
-const COLLATION_ES = { locale: 'es', strength: 1 }; // strength 1: ignora tildes Y mayúsculas
+// Construye condiciones $or para búsqueda por nombre (sin tildes) y NIT (sin separadores)
+const buildSearch = (search) => {
+  const norm       = escapeRegex(search.normalize('NFD').replace(/[̀-ͯ]/g, ''));
+  // Intercala [.\-]? entre cada carácter para que "900889" encuentre "900.889.001-0"
+  const nitPattern = search.replace(/\./g, '').replace(/-/g, '').split('').map(escapeRegex).join('[.\\-]?');
+  return { $or: [
+    { razonSocialNorm: new RegExp(norm,       'i') },
+    { nit:             new RegExp(nitPattern, 'i') },
+  ]};
+};
 
 // GET /api/afiliados/stats
 router.get('/stats', protect, async (req, res) => {
@@ -73,22 +80,20 @@ router.get('/cartera/lista', protect, async (req, res) => {
     if (rangoDias === '61+')   conditions.push({ diasMora: { $gt: 60 } });
 
     if (search) {
-      const re = new RegExp(escapeRegex(normalize(search)), 'i');
-      conditions.push({ $or: [{ razonSocial: re }, { nit: re }] });
+      conditions.push(buildSearch(search));
     }
 
     const filter = conditions.length > 1 ? { $and: conditions } : conditions[0] || {};
 
     const [afiliados, total] = await Promise.all([
       Afiliado.find(filter)
-        .collation(COLLATION_ES)
         .populate('ejecutivoAsignado', 'nombre')
         .sort({ diasMora: -1, saldoPendiente: -1 })
         .skip((page - 1) * limit)
         .limit(Number(limit))
         .select('razonSocial nit diasMora saldoPendiente fechaVencimiento estadoCartera ejecutivoAsignado interacciones compromisos')
         .lean(),
-      Afiliado.countDocuments(filter).collation(COLLATION_ES),
+      Afiliado.countDocuments(filter),
     ]);
 
     afiliados.forEach((a) => {
@@ -112,18 +117,16 @@ router.get('/', protect, async (req, res) => {
     if (estadoCartera) filter.estadoCartera = estadoCartera;
     if (estado) filter.estado = estado;
     if (search) {
-      const re = new RegExp(escapeRegex(normalize(search)), 'i');
-      filter.$or = [{ razonSocial: re }, { nit: re }];
+      Object.assign(filter, buildSearch(search));
     }
     const [afiliados, total] = await Promise.all([
       Afiliado.find(filter)
-        .collation(COLLATION_ES)
         .populate('ejecutivoAsignado', 'nombre')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(Number(limit))
         .lean(),
-      Afiliado.countDocuments(filter).collation(COLLATION_ES),
+      Afiliado.countDocuments(filter),
     ]);
     res.json({ success: true, afiliados, total, page: Number(page) });
   } catch (error) {

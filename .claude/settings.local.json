@@ -14,7 +14,10 @@
       "Bash(node scripts/seed.js)",
       "Bash(node -e \"require\\('./routes/afiliados'\\); console.log\\('OK'\\)\")",
       "Bash(node -e \"require\\('./models/Afiliado'\\); console.log\\('OK'\\)\")",
-      "Bash(node -e \"require\\('./routes/afiliados'\\); require\\('./routes/auth'\\); console.log\\('OK'\\)\")"
+      "Bash(node -e \"require\\('./routes/afiliados'\\); require\\('./routes/auth'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"console.log\\('/[̀-ͯ]/g'\\)\")",
+      "Bash(node -e \"require\\('./routes/afiliados'\\); require\\('./models/Afiliado'\\); console.log\\('OK'\\)\")",
+      "Bash(git commit -m 'feat: búsqueda normalizada sin tildes \\(razonSocialNorm\\) *)"
     ]
   }
 }
