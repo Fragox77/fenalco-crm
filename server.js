@@ -6,6 +6,8 @@ const connectDB = require('./config/db');
 
 const authRoutes = require('./routes/auth');
 const afiliadosRoutes = require('./routes/afiliados');
+const notificacionesRoutes = require('./routes/notificaciones');
+const { iniciarJob } = require('./services/notificationJob');
 
 const path = require('path');
 
@@ -25,6 +27,7 @@ app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/afiliados', afiliadosRoutes);
+app.use('/api/notificaciones', notificacionesRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -45,4 +48,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  iniciarJob();
 });
