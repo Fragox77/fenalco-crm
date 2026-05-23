@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRM Fenalco — Reportes</title>
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            fenalco: {
+              purple: '#280071', 'purple-dark': '#1e0057', 'purple-light': '#3a0099',
+              green: '#00CE7C', 'green-hover': '#00b369',
+              blue: '#009CDE', gray: '#484954',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body class="bg-[#f5f5f5] min-h-screen" x-data="reportesApp()" x-init="init()">
+
+  <!-- ── SIDEBAR ──────────────────────────────────────────── -->
+  <div x-show="sidebarOpen" @click="sidebarOpen = false"
+    class="fixed inset-0 bg-black/40 z-20 lg:hidden"
+    x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+    x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+  </div>
+
+  <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+    class="fixed top-0 left-0 h-full w-64 bg-fenalco-purple z-30 flex flex-col transition-transform duration-300">
+    <div class="flex items-center justify-center px-6 py-6 border-b border-white/10">
+      <img src="/img/logo.svg" alt="Fenalco" class="h-10"
+        onerror="this.outerHTML='<span class=\'text-white font-bold text-xl\'>Fenalco</span>'" />
+    </div>
+    <nav class="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+      <template x-for="item in navItems" :key="item.id">
+        <a :href="item.href"
+          :class="item.active ? 'bg-white/15 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'"
+          class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
+          <span x-html="item.icon" class="w-5 h-5 flex-shrink-0"></span>
+          <span x-text="item.label"></span>
+          <span x-show="item.active" class="ml-auto w-1.5 h-1.5 rounded-full bg-fenalco-green"></span>
+        </a>
+      </template>
+    </nav>
+    <div class="px-4 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-fenalco-green flex items-center justify-center flex-shrink-0">
+          <span class="text-white text-xs font-bold" x-text="iniciales"></span>
+        </div>
+        <div class="min-w-0">
+          <p class="text-white text-xs font-medium truncate" x-text="nombre"></p>
+          <p class="text-white/50 text-xs capitalize" x-text="role"></p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── LAYOUT PRINCIPAL ──────────────────────────────────── -->
+  <div class="lg:ml-64 flex flex-col min-h-screen">
+
+    <!-- HEADER -->
+    <header class="bg-white border-b border-gray-200 px-4 lg:px-8 py-3 flex items-center justify-between sticky top-0 z-10">
+      <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-2 rounded-lg text-fenalco-gray hover:bg-gray-100 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="hidden lg:flex items-center gap-2">
+        <span class="text-fenalco-gray text-sm">CRM</span>
+        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        <span class="text-fenalco-purple text-sm font-medium">Reportes</span>
+      </div>
+      <div class="flex items-center gap-3 ml-auto">
+        <!-- Campanita notificaciones -->
+        <div class="relative" x-data="notifBell()" x-init="init()">
+          <button @click="toggleDropdown()" class="relative p-2 rounded-lg text-fenalco-gray hover:bg-gray-100 transition-colors" title="Notificaciones">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span x-show="count > 0" x-text="count > 99 ? '99+' : count" class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none"></span>
+          </button>
+          <div x-show="open" @click.outside="open = false"
+            x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden" style="display:none;">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <span class="text-sm font-semibold text-gray-800">Notificaciones</span>
+              <button x-show="count > 0" @click="leerTodas()" class="text-xs text-fenalco-blue hover:underline">Marcar todas leídas</button>
+            </div>
+            <div class="max-h-72 overflow-y-auto divide-y divide-gray-50">
+              <template x-if="items.length === 0"><div class="py-8 text-center text-sm text-gray-400">Sin notificaciones pendientes</div></template>
+              <template x-for="n in items" :key="n._id">
+                <div :class="!n.leida ? 'bg-blue-50/40' : ''" class="px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer flex items-start gap-3" @click="marcarLeida(n)">
+                  <div :class="iconoBg(n.tipo)" class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg class="w-3.5 h-3.5" :class="iconoColor(n.tipo)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path x-show="n.tipo === 'mora_critica'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      <path x-show="n.tipo !== 'mora_critica'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold text-gray-800 truncate" x-text="n.titulo"></p>
+                    <p class="text-xs text-gray-500 mt-0.5 line-clamp-2" x-text="n.mensaje"></p>
+                    <p class="text-[11px] text-gray-400 mt-1" x-text="fmtFecha(n.createdAt)"></p>
+                  </div>
+                  <span x-show="!n.leida" class="w-2 h-2 rounded-full bg-fenalco-blue flex-shrink-0 mt-1"></span>
+                </div>
+              </template>
+            </div>
+            <div class="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
+              <a href="/dashboard.html#notificaciones" class="text-xs text-fenalco-blue hover:underline font-medium">Ver todas las notificaciones →</a>
+            </div>
+          </div>
+        </div>
+        <div class="hidden sm:flex flex-col items-end">
+          <span class="text-sm font-medium text-gray-800" x-text="nombre"></span>
+          <span class="text-xs text-fenalco-gray capitalize" x-text="role"></span>
+        </div>
+        <div class="w-8 h-8 rounded-full bg-fenalco-purple flex items-center justify-center">
+          <span class="text-white text-xs font-bold" x-text="iniciales"></span>
+        </div>
+        <button @click="logout()" class="flex items-center gap-1.5 text-xs text-fenalco-gray hover:text-red-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          <span class="hidden sm:inline">Salir</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── CONTENIDO ─────────────────────────────────────── -->
+    <main class="flex-1 px-4 lg:px-8 py-6">
+
+      <!-- Título + botón actualizar -->
+      <div class="mb-6 flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold text-fenalco-purple">Reportes</h1>
+          <p class="text-fenalco-gray text-sm mt-0.5">Análisis de cartera y actividad</p>
+        </div>
+        <button @click="fetchReportes()" :disabled="loading"
+          class="flex items-center gap-1.5 text-sm border border-gray-300 text-fenalco-gray px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <svg :class="loading ? 'animate-spin' : ''" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Actualizar
+        </button>
+      </div>
+
+      <!-- Loading spinner -->
+      <div x-show="loading" class="flex items-center justify-center py-20">
+        <svg class="animate-spin w-7 h-7 text-fenalco-purple" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+      </div>
+
+      <!-- Error -->
+      <div x-show="error" class="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 mb-6" x-text="error"></div>
+
+      <!-- Contenido gráficas -->
+      <div x-show="!loading && !error">
+
+        <!-- Fila 1: Donut + Barras horizontales -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+          <!-- Distribución de cartera -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 class="font-semibold text-fenalco-purple">Distribución de cartera</h2>
+            <p class="text-xs text-fenalco-gray mt-0.5 mb-5">Estado actual de todos los afiliados</p>
+            <div class="relative h-56">
+              <canvas id="chartCartera"></canvas>
+            </div>
+          </div>
+
+          <!-- Mora por antigüedad -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 class="font-semibold text-fenalco-purple">Mora por antigüedad</h2>
+            <p class="text-xs text-fenalco-gray mt-0.5 mb-5">Afiliados en mora agrupados por días de atraso</p>
+            <div x-show="!reportes.moraRangos?.length" class="flex items-center justify-center h-56 text-fenalco-gray text-sm">
+              Sin afiliados en mora
+            </div>
+            <div x-show="reportes.moraRangos?.length" class="relative h-56">
+              <canvas id="chartMora"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Fila 2: Línea interacciones -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h2 class="font-semibold text-fenalco-purple">Actividad de contactos</h2>
+          <p class="text-xs text-fenalco-gray mt-0.5 mb-5">Interacciones registradas por mes — últimos 6 meses</p>
+          <div class="relative h-48">
+            <canvas id="chartInteracciones"></canvas>
+          </div>
+        </div>
+
+        <!-- Fila 3: Ranking ejecutivos -->
+        <div class="bg-white rounded-xl border border-gray-200">
+          <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="font-semibold text-fenalco-purple">Ranking de ejecutivos</h2>
+            <p class="text-xs text-fenalco-gray mt-0.5">Gestión de cartera por responsable asignado</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-fenalco-gray text-xs uppercase tracking-wide border-b border-gray-100 bg-gray-50">
+                  <th class="px-6 py-3 font-medium w-8">#</th>
+                  <th class="px-6 py-3 font-medium">Ejecutivo</th>
+                  <th class="px-6 py-3 font-medium text-right">Asignados</th>
+                  <th class="px-6 py-3 font-medium text-right">En mora</th>
+                  <th class="px-6 py-3 font-medium text-right">Interacciones</th>
+                  <th class="px-6 py-3 font-medium text-right">Saldo gestionado</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                <template x-for="(ej, idx) in reportes.rankingEjecutivos || []" :key="ej._id || idx">
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 text-fenalco-gray font-medium" x-text="idx + 1"></td>
+                    <td class="px-6 py-4">
+                      <div class="flex items-center gap-2.5">
+                        <div class="w-7 h-7 rounded-full bg-fenalco-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                          x-text="ej.nombre.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase()">
+                        </div>
+                        <span class="font-medium text-gray-800" x-text="ej.nombre"></span>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <span class="font-bold text-fenalco-purple" x-text="ej.asignados"></span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <span x-show="ej.enMora > 0"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+                        x-text="ej.enMora"></span>
+                      <span x-show="ej.enMora === 0" class="text-fenalco-gray">—</span>
+                    </td>
+                    <td class="px-6 py-4 text-right text-gray-700" x-text="ej.totalInteracciones"></td>
+                    <td class="px-6 py-4 text-right font-mono text-xs"
+                      :class="ej.saldoGestionado > 0 ? 'text-red-600 font-semibold' : 'text-fenalco-gray'"
+                      x-text="fmtPeso(ej.saldoGestionado)">
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!(reportes.rankingEjecutivos || []).length">
+                  <td colspan="6" class="px-6 py-10 text-center text-fenalco-gray text-sm">Sin ejecutivos asignados</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /contenido -->
+    </main>
+  </div><!-- /layout -->
+
+  <script>
+    const NAV_ITEMS = [
+      { id: 'dashboard',      label: 'Dashboard',      href: '/dashboard.html',                  active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>' },
+      { id: 'afiliados',      label: 'Afiliados',      href: '/afiliados.html',                  active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' },
+      { id: 'cartera',        label: 'Cartera',        href: '/cartera.html',                    active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>' },
+      { id: 'reportes',       label: 'Reportes',       href: '/reportes.html',                   active: true,  icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' },
+      { id: 'notificaciones', label: 'Notificaciones', href: '/dashboard.html#notificaciones',   active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>' },
+      { id: 'ejecutivos',     label: 'Ejecutivos',     href: '/ejecutivos.html',                 active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' },
+      { id: 'usuarios',       label: 'Usuarios',       href: '/usuarios.html', adminOnly: true,  active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' },
+    ];
+
+    function reportesApp() {
+      return {
+        token:      localStorage.getItem('crm_token'),
+        nombre:     localStorage.getItem('crm_nombre') || 'Usuario',
+        role:       localStorage.getItem('crm_role') || '',
+        sidebarOpen: false,
+
+        get navItems() {
+          return NAV_ITEMS.filter(i => !i.adminOnly || localStorage.getItem('crm_role') === 'admin');
+        },
+        get iniciales() {
+          return this.nombre.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+        },
+
+        loading: true,
+        error: '',
+        reportes: { distribucionCartera: [], moraRangos: [], interaccionesPorMes: [], rankingEjecutivos: [] },
+        _charts: {},
+
+        async init() {
+          if (!this.token) { window.location.href = '/'; return; }
+          await this.fetchReportes();
+        },
+
+        async fetchReportes() {
+          Object.values(this._charts).forEach(c => { try { c.destroy(); } catch(e) {} });
+          this._charts = {};
+          this.loading = true;
+          this.error = '';
+          try {
+            const res = await fetch('/api/afiliados/reportes', {
+              headers: { Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+            });
+            if (res.status === 401) { this.logout(); return; }
+            if (!res.ok) throw new Error('Error al cargar reportes');
+            this.reportes = await res.json();
+            await this.$nextTick();
+            this.renderCharts();
+            this.loading = false;
+          } catch (err) {
+            this.error = err.message || 'No se pudieron cargar los reportes';
+            this.loading = false;
+          }
+        },
+
+        renderCharts() {
+          this.renderChartCartera();
+          this.renderChartMora();
+          this.renderChartInteracciones();
+        },
+
+        renderChartCartera() {
+          const el = document.getElementById('chartCartera');
+          if (!el) return;
+          const existing = Chart.getChart(el);
+          if (existing) existing.destroy();
+          const colorMap = { al_dia: '#00CE7C', en_mora: '#EF4444', acuerdo_pago: '#F59E0B', suspendido: '#9CA3AF' };
+          const labelMap = { al_dia: 'Al día', en_mora: 'En mora', acuerdo_pago: 'Acuerdo de pago', suspendido: 'Suspendido' };
+          const dist = this.reportes.distribucionCartera || [];
+          this._charts.cartera = new Chart(el, {
+            type: 'doughnut',
+            data: {
+              labels: dist.map(d => labelMap[d._id] || d._id),
+              datasets: [{ data: dist.map(d => d.count), backgroundColor: dist.map(d => colorMap[d._id] || '#9CA3AF'), borderWidth: 3, borderColor: '#fff' }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '65%',
+              plugins: {
+                legend: { position: 'right', labels: { font: { size: 11 }, padding: 14, boxWidth: 12 } },
+                tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} afiliados` } },
+              },
+            },
+          });
+        },
+
+        renderChartMora() {
+          if (!this.reportes.moraRangos?.length) return;
+          const el = document.getElementById('chartMora');
+          if (!el) return;
+          const existingMora = Chart.getChart(el);
+          if (existingMora) existingMora.destroy();
+          const rangoLabel = { 1: '1 – 30 días', 31: '31 – 60 días', 61: '61 – 90 días', '91+': '91 + días' };
+          const rangoColor = { 1: '#FCD34D', 31: '#FB923C', 61: '#EF4444', '91+': '#991B1B' };
+          const rangos = this.reportes.moraRangos || [];
+          this._charts.mora = new Chart(el, {
+            type: 'bar',
+            data: {
+              labels: rangos.map(r => rangoLabel[r._id] || r._id),
+              datasets: [{ label: 'Afiliados', data: rangos.map(r => r.count), backgroundColor: rangos.map(r => rangoColor[r._id] || '#EF4444'), borderRadius: 6, borderSkipped: false }],
+            },
+            options: {
+              indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => ` ${c.raw} afiliados` } },
+              },
+              scales: {
+                x: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 11 }, color: '#6B7280', precision: 0 } },
+                y: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#374151' } },
+              },
+            },
+          });
+        },
+
+        renderChartInteracciones() {
+          const el = document.getElementById('chartInteracciones');
+          if (!el) return;
+          const existingInt = Chart.getChart(el);
+          if (existingInt) existingInt.destroy();
+          const now = new Date();
+          const meses = Array.from({ length: 6 }, (_, i) => {
+            const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+            return { year: d.getFullYear(), month: d.getMonth() + 1, label: d.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' }) };
+          });
+          const dataMap = {};
+          (this.reportes.interaccionesPorMes || []).forEach(item => {
+            dataMap[`${item._id.year}-${item._id.month}`] = item.count;
+          });
+          this._charts.interacciones = new Chart(el, {
+            type: 'line',
+            data: {
+              labels: meses.map(m => m.label),
+              datasets: [{
+                label: 'Interacciones',
+                data: meses.map(m => dataMap[`${m.year}-${m.month}`] || 0),
+                borderColor: '#280071', backgroundColor: 'rgba(40,0,113,0.07)',
+                fill: true, tension: 0.4,
+                pointBackgroundColor: '#280071', pointRadius: 4, pointHoverRadius: 6, borderWidth: 2,
+              }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: c => ` ${c.raw} interacciones` } },
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#6B7280' } },
+                y: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 11 }, color: '#6B7280', precision: 0 }, beginAtZero: true },
+              },
+            },
+          });
+        },
+
+        fmtPeso(n) {
+          if (!n) return '$ 0';
+          return '$ ' + Number(n).toLocaleString('es-CO');
+        },
+
+        logout() {
+          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+          ['crm_token', 'crm_role', 'crm_nombre'].forEach(k => localStorage.removeItem(k));
+          window.location.href = '/';
+        },
+      };
+    }
+
+    function notifBell() {
+      return {
+        open: false, count: 0, items: [],
+        _token: localStorage.getItem('crm_token'),
+        async init() {
+          await this.fetchCount();
+          setInterval(() => this.fetchCount(), 60000);
+        },
+        async fetchCount() {
+          try {
+            const r = await fetch('/api/notificaciones/count', { headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
+            if (r.ok) { const d = await r.json(); this.count = d.count; }
+          } catch {}
+        },
+        async fetchItems() {
+          try {
+            const r = await fetch('/api/notificaciones?limite=8', { headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
+            if (r.ok) { const d = await r.json(); this.items = d.notificaciones; }
+          } catch {}
+        },
+        async toggleDropdown() { this.open = !this.open; if (this.open) await this.fetchItems(); },
+        async marcarLeida(n) {
+          if (!n.leida) { n.leida = true; this.count = Math.max(0, this.count - 1); fetch(`/api/notificaciones/${n._id}/leer`, { method: 'PATCH', headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' }); }
+          if (n.afiliado) window.location.href = '/cartera.html';
+        },
+        async leerTodas() {
+          await fetch('/api/notificaciones/leer-todas', { method: 'PATCH', headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
+          this.items.forEach(n => n.leida = true); this.count = 0;
+        },
+        iconoBg(t) { return t === 'mora_critica' ? 'bg-red-100' : 'bg-amber-100'; },
+        iconoColor(t) { return t === 'mora_critica' ? 'text-red-600' : 'text-amber-600'; },
+        fmtFecha(iso) { return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); },
+      };
+    }
+  </script>
+
+</body>
+</html>
