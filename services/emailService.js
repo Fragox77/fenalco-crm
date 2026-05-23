@@ -131,4 +131,44 @@ async function enviarAlertaCompromisosVencidos(destinatario, compromisos) {
   }
 }
 
-module.exports = { enviarAlertaMora, enviarAlertaCompromisosVencidos };
+async function enviarAlertaVencimiento(destinatario, afiliados) {
+  const transporter = createTransporter();
+  if (!transporter) return false;
+
+  const filas = afiliados
+    .map(
+      a => `<tr>
+        <td>${a.razonSocial}</td>
+        <td>${a.nit}</td>
+        <td>${new Date(a.fechaVencimiento).toLocaleDateString('es-CO')}</td>
+        <td><span class="badge-red">${a.diasParaVencer} día${a.diasParaVencer !== 1 ? 's' : ''}</span></td>
+      </tr>`
+    )
+    .join('');
+
+  const contenido = `
+    <p>Hola <strong>${destinatario.nombre}</strong>,</p>
+    <p>Las siguientes afiliaciones a tu cargo están <strong>próximas a vencer</strong>. Gestiona la renovación antes de la fecha límite:</p>
+    <table>
+      <thead><tr><th>Razón social</th><th>NIT</th><th>Vence</th><th>Faltan</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <p>Ingresa al CRM para registrar la gestión y confirmar la renovación.</p>
+    <a class="btn" href="${process.env.CLIENT_URL || 'http://localhost:5000'}/afiliados.html">Ver afiliados →</a>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'CRM Fenalco <noreply@fenalco.com>',
+      to: destinatario.email,
+      subject: `🔔 Renovaciones próximas — ${afiliados.length} afiliado${afiliados.length !== 1 ? 's' : ''} por vencer`,
+      html: htmlBase(contenido),
+    });
+    return true;
+  } catch (err) {
+    console.error('[Email] Error al enviar alerta vencimiento:', err.message);
+    return false;
+  }
+}
+
+module.exports = { enviarAlertaMora, enviarAlertaCompromisosVencidos, enviarAlertaVencimiento };

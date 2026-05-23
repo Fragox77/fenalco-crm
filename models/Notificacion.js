@@ -4,7 +4,7 @@ const notificacionSchema = new mongoose.Schema(
   {
     tipo: {
       type: String,
-      enum: ['mora_critica', 'compromiso_vencido', 'cuota_vencida'],
+      enum: ['mora_critica', 'compromiso_vencido', 'cuota_vencida', 'vencimiento_proximo'],
       required: true,
     },
     titulo: { type: String, required: true, trim: true },

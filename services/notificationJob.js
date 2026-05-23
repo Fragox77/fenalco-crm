@@ -2,7 +2,10 @@ const cron = require('node-cron');
 const Afiliado = require('../models/Afiliado');
 const User = require('../models/User');
 const Notificacion = require('../models/Notificacion');
-const { enviarAlertaMora, enviarAlertaCompromisosVencidos } = require('./emailService');
+const { enviarAlertaMora, enviarAlertaCompromisosVencidos, enviarAlertaVencimiento } = require('./emailService');
+
+// Umbrales (en días) para alertar afiliaciones próximas a vencer
+const UMBRALES_VENCIMIENTO = [30, 15, 7];
 
 async function ejecutarCheckNotificaciones() {
   console.log('[NotifJob] Ejecutando check de notificaciones:', new Date().toLocaleString('es-CO'));
@@ -10,6 +13,7 @@ async function ejecutarCheckNotificaciones() {
   try {
     await checkMoraCritica();
     await checkCompromisosVencidos();
+    await checkVencimientosProximos();
     console.log('[NotifJob] Check completado.');
   } catch (err) {
     console.error('[NotifJob] Error en check:', err.message);
@@ -119,6 +123,87 @@ async function checkCompromisosVencidos() {
       if (emailOk) {
         notif.emailEnviado = true;
         await notif.save();
+      }
+    }
+  }
+}
+
+async function checkVencimientosProximos() {
+  const hoy = new Date();
+  hoy.setUTCHours(0, 0, 0, 0);
+
+  // Construye los rangos [inicio, fin] de cada umbral en una sola consulta
+  // Se usa UTC para que coincida con cómo MongoDB almacena las fechas (UTC midnight)
+  const rangos = UMBRALES_VENCIMIENTO.map((dias) => {
+    const inicio = new Date(hoy);
+    inicio.setUTCDate(inicio.getUTCDate() + dias);
+    const fin = new Date(inicio);
+    fin.setUTCHours(23, 59, 59, 999);
+    return { dias, inicio, fin };
+  });
+
+  const limiteSuperior = new Date(Math.max(...rangos.map((r) => r.fin.getTime())));
+
+  const afiliados = await Afiliado.find({
+    estado: 'activo',
+    fechaVencimiento: { $gte: hoy, $lte: limiteSuperior },
+    ejecutivoAsignado: { $exists: true, $ne: null },
+  }).populate('ejecutivoAsignado', 'nombre email');
+
+  if (!afiliados.length) return;
+
+  // Agrupar por ejecutivo solo los que caen exactamente en uno de los umbrales
+  const porEjecutivo = {};
+
+  for (const af of afiliados) {
+    const venc = new Date(af.fechaVencimiento);
+    const rango = rangos.find((r) => venc >= r.inicio && venc <= r.fin);
+    if (!rango) continue;
+
+    const ejId = af.ejecutivoAsignado._id.toString();
+    if (!porEjecutivo[ejId]) {
+      porEjecutivo[ejId] = { ejecutivo: af.ejecutivoAsignado, items: [] };
+    }
+    porEjecutivo[ejId].items.push({ af, dias: rango.dias });
+  }
+
+  for (const ejId of Object.keys(porEjecutivo)) {
+    const { ejecutivo, items } = porEjecutivo[ejId];
+    const paraEmail = [];
+
+    for (const { af, dias } of items) {
+      // Evitar duplicar la notificación del mismo afiliado el mismo día
+      const existe = await Notificacion.findOne({
+        tipo: 'vencimiento_proximo',
+        afiliado: af._id,
+        ejecutivo: ejecutivo._id,
+        createdAt: { $gte: hoy },
+      });
+      if (existe) continue;
+
+      await Notificacion.create({
+        tipo: 'vencimiento_proximo',
+        titulo: `Renovación próxima: ${af.razonSocial}`,
+        mensaje: `La afiliación de ${af.razonSocial} vence el ${new Date(af.fechaVencimiento).toLocaleDateString('es-CO')} (faltan ${dias} días). Gestiona la renovación.`,
+        afiliado: af._id,
+        ejecutivo: ejecutivo._id,
+      });
+
+      paraEmail.push({
+        razonSocial: af.razonSocial,
+        nit: af.nit,
+        fechaVencimiento: af.fechaVencimiento,
+        diasParaVencer: dias,
+      });
+    }
+
+    if (paraEmail.length) {
+      const emailOk = await enviarAlertaVencimiento(ejecutivo, paraEmail);
+      if (emailOk) {
+        await Notificacion.updateMany(
+          { tipo: 'vencimiento_proximo', ejecutivo: ejecutivo._id, createdAt: { $gte: hoy } },
+          { $set: { emailEnviado: true } }
+        );
       }
     }
   }
