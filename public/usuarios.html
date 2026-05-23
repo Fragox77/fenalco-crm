@@ -712,4 +712,34 @@
         async init() {
           await this.fetchCount();
           setInterval(() => this.fetchCount(), 60000);
-       
+        },
+        async fetchCount() {
+          try {
+            const r = await fetch('/api/notificaciones/count', { headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
+            if (r.ok) { const d = await r.json(); this.count = d.count; }
+          } catch {}
+        },
+        async fetchItems() {
+          try {
+            const r = await fetch('/api/notificaciones?limite=8', { headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
+            if (r.ok) { const d = await r.json(); this.items = d.notificaciones; }
+          } catch {}
+        },
+        async toggleDropdown() { this.open = !this.open; if (this.open) await this.fetchItems(); },
+        async marcarLeida(n) {
+          if (!n.leida) { n.leida = true; this.count = Math.max(0, this.count - 1); fetch(`/api/notificaciones/${n._id}/leer`, { method: 'PATCH', headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' }); }
+          if (n.afiliado) window.location.href = '/cartera.html';
+        },
+        async leerTodas() {
+          await fetch('/api/notificaciones/leer-todas', { method: 'PATCH', headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
+          this.items.forEach(n => n.leida = true); this.count = 0;
+        },
+        iconoBg(t) { return t === 'mora_critica' ? 'bg-red-100' : 'bg-amber-100'; },
+        iconoColor(t) { return t === 'mora_critica' ? 'text-red-600' : 'text-amber-600'; },
+        fmtFecha(iso) { return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); },
+      };
+    }
+  </script>
+
+</body>
+</html>
