@@ -167,6 +167,32 @@ router.patch('/admin/usuarios/:id/password', protect, authorize('admin'), async 
   }
 });
 
+// PATCH /api/auth/admin/usuarios/:id/estado — activar/desactivar usuario (admin)
+router.patch('/admin/usuarios/:id/estado', protect, authorize('admin'), async (req, res) => {
+  const { activo } = req.body;
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ message: 'El campo activo debe ser true o false' });
+  }
+  if (req.params.id === req.user._id.toString() && activo === false) {
+    return res.status(400).json({ message: 'No puedes desactivar tu propia cuenta' });
+  }
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { activo },
+      { new: true, runValidators: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+    res.json({
+      success: true,
+      message: activo ? 'Usuario activado' : 'Usuario desactivado',
+      user,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // PUT /api/auth/cambiar-password
 router.put('/cambiar-password', protect, async (req, res) => {
   const { passwordActual, passwordNueva } = req.body;

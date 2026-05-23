@@ -42,6 +42,7 @@
     <nav class="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
       <template x-for="item in navItems" :key="item.id">
         <a :href="item.href"
+          @click="item.goTo && sessionStorage.setItem('goTo', item.goTo)"
           :class="item.active ? 'bg-white/15 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'"
           class="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors">
           <span x-html="item.icon" class="w-5 h-5 flex-shrink-0"></span>
@@ -110,7 +111,7 @@
               </template>
             </div>
             <div class="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
-              <a href="/notificaciones.html" class="text-xs text-fenalco-blue hover:underline font-medium">Ver todas las notificaciones →</a>
+              <a href="/dashboard.html#notificaciones" class="text-xs text-fenalco-blue hover:underline font-medium">Ver todas las notificaciones →</a>
             </div>
           </div>
         </div>
@@ -270,6 +271,14 @@
                   <!-- Acciones -->
                   <td class="px-6 py-4">
                     <div class="flex items-center justify-center gap-1">
+                      <!-- Activar / desactivar -->
+                      <button @click="toggleEstado(u)" :disabled="togglingId === u._id"
+                        :title="u.activo ? 'Desactivar' : 'Activar'"
+                        :class="u.activo ? 'bg-fenalco-green' : 'bg-gray-300'"
+                        class="relative inline-flex w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 disabled:opacity-50 mr-1">
+                        <span :class="u.activo ? 'translate-x-5' : 'translate-x-1'"
+                          class="inline-block w-4 h-4 mt-1 bg-white rounded-full shadow-sm transition-transform duration-200"></span>
+                      </button>
                       <button @click="openEditar(u)" title="Editar"
                         class="p-1.5 rounded-lg text-fenalco-gray hover:text-fenalco-blue hover:bg-fenalco-blue/10 transition-colors">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -473,7 +482,8 @@
       { id: 'dashboard', label: 'Dashboard', href: '/dashboard.html',  active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>' },
       { id: 'afiliados', label: 'Afiliados', href: '/afiliados.html',  active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' },
       { id: 'cartera',   label: 'Cartera',   href: '/cartera.html',    active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>' },
-      { id: 'reportes',   label: 'Reportes',   href: '/dashboard.html',   active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' },
+      { id: 'reportes',   label: 'Reportes',   href: '/reportes.html',             active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>' },
+      { id: 'notificaciones', label: 'Notificaciones', href: '/dashboard.html#notificaciones', active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>' },
       { id: 'ejecutivos', label: 'Ejecutivos', href: '/ejecutivos.html', active: false, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' },
       { id: 'usuarios',   label: 'Usuarios',   href: '/usuarios.html',   active: true,  adminOnly: true, icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>' },
     ];
@@ -508,6 +518,9 @@
         modalEliminar: false,
         eliminandoUser: null,
         eliminarLoading: false, eliminarError: '',
+
+        // activar / desactivar en línea
+        togglingId: null,
 
         get filtrados() {
           return this.usuarios.filter(u => {
@@ -622,6 +635,29 @@
           }
         },
 
+        async toggleEstado(u) {
+          if (this.togglingId) return;
+          this.togglingId = u._id;
+          this.error = '';
+          const nuevoEstado = !u.activo;
+          try {
+            const res = await fetch(`/api/auth/admin/usuarios/${u._id}/estado`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+              body: JSON.stringify({ activo: nuevoEstado }),
+            });
+            if (res.status === 401) { this.logout(); return; }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'No se pudo cambiar el estado');
+            u.activo = data.user.activo;
+          } catch (err) {
+            this.error = err.message;
+          } finally {
+            this.togglingId = null;
+          }
+        },
+
         confirmarEliminar(u) {
           this.eliminandoUser = u;
           this.eliminarError = '';
@@ -676,34 +712,4 @@
         async init() {
           await this.fetchCount();
           setInterval(() => this.fetchCount(), 60000);
-        },
-        async fetchCount() {
-          try {
-            const r = await fetch('/api/notificaciones/count', { headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
-            if (r.ok) { const d = await r.json(); this.count = d.count; }
-          } catch {}
-        },
-        async fetchItems() {
-          try {
-            const r = await fetch('/api/notificaciones?limite=8', { headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
-            if (r.ok) { const d = await r.json(); this.items = d.notificaciones; }
-          } catch {}
-        },
-        async toggleDropdown() { this.open = !this.open; if (this.open) await this.fetchItems(); },
-        async marcarLeida(n) {
-          if (!n.leida) { n.leida = true; this.count = Math.max(0, this.count - 1); fetch(`/api/notificaciones/${n._id}/leer`, { method: 'PATCH', headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' }); }
-          if (n.afiliado) window.location.href = '/cartera.html';
-        },
-        async leerTodas() {
-          await fetch('/api/notificaciones/leer-todas', { method: 'PATCH', headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include' });
-          this.items.forEach(n => n.leida = true); this.count = 0;
-        },
-        iconoBg(t) { return t === 'mora_critica' ? 'bg-red-100' : 'bg-amber-100'; },
-        iconoColor(t) { return t === 'mora_critica' ? 'text-red-600' : 'text-amber-600'; },
-        fmtFecha(iso) { return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); },
-      };
-    }
-  </script>
-
-</body>
-</html>
+       
