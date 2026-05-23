@@ -30,6 +30,10 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude / Cowork config local
+.claude/settings.json
+.claude/settings.local.json
+
 # Testing
 coverage/
 
