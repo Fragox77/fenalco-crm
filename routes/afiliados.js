@@ -451,6 +451,62 @@ router.post('/:id/compromiso', protect, async (req, res) => {
   }
 });
 
+// PATCH /api/afiliados/:id/pago-recibido
+router.patch('/:id/pago-recibido', protect, async (req, res) => {
+  try {
+    const afiliado = await Afiliado.findByIdAndUpdate(
+      req.params.id,
+      { estadoCartera: 'al_dia', diasMora: 0, saldoPendiente: 0 },
+      { new: true }
+    );
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+    res.json({ success: true, message: 'Pago registrado. Afiliado marcado al día.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al registrar pago', error: err.message });
+  }
+});
+
+// PATCH /api/afiliados/:id/renovar — renovar afiliación por 12 meses
+router.patch('/:id/renovar', protect, async (req, res) => {
+  const { meses } = req.body;
+  const periodo = Number(meses) > 0 ? Number(meses) : 12;
+  try {
+    const afiliado = await Afiliado.findById(req.params.id);
+    if (!afiliado) return res.status(404).json({ message: 'Afiliado no encontrado' });
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    // Si la vigencia actual aún no ha vencido, se extiende desde esa fecha; si no, desde hoy
+    const base = afiliado.fechaVencimiento && new Date(afiliado.fechaVencimiento) > hoy
+      ? new Date(afiliado.fechaVencimiento)
+      : new Date(hoy);
+
+    const nuevaVencimiento = new Date(base);
+    nuevaVencimiento.setMonth(nuevaVencimiento.getMonth() + periodo);
+
+    afiliado.fechaVencimiento = nuevaVencimiento;
+    afiliado.estado = 'activo';
+    if (!afiliado.fechaAfiliacion) afiliado.fechaAfiliacion = hoy;
+
+    afiliado.interacciones.unshift({
+      tipo: 'otro',
+      fecha: new Date(),
+      descripcion: `Renovación de afiliación por ${periodo} meses. Nueva vigencia hasta ${nuevaVencimiento.toLocaleDateString('es-CO')}.`,
+      ejecutivo: req.user._id,
+    });
+
+    await afiliado.save();
+    res.json({
+      success: true,
+      message: `Afiliación renovada hasta ${nuevaVencimiento.toLocaleDateString('es-CO')}.`,
+      fechaVencimiento: nuevaVencimiento,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error al renovar afiliación', error: err.message });
+  }
+});
+
 // PATCH /api/afiliados/:id/compromisos/:compromisoId
 router.patch('/:id/compromisos/:compromisoId', protect, async (req, res) => {
   try {
