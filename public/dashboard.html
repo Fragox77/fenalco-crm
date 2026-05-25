@@ -26,6 +26,8 @@
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
@@ -252,7 +254,7 @@
             <strong x-text="moraCritica.length"></strong>
             <span x-text="moraCritica.length === 1 ? ' afiliado tiene' : ' afiliados tienen'"></span>
             mora crítica (más de 60 días sin pago).
-            <a href="/cartera.html" class="font-semibold underline hover:text-red-900 ml-1">Ver cartera →</a>
+            <a href="/dashboard.html#cartera" class="font-semibold underline hover:text-red-900 ml-1">Ver cartera →</a>
           </p>
           <button
             @click="alertaDismissed = true"
@@ -411,7 +413,7 @@
               class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
               x-text="moraCritica.length"
             ></span>
-            <a href="/cartera.html" class="ml-auto text-xs text-fenalco-blue hover:underline font-medium">
+            <a href="/dashboard.html#cartera" class="ml-auto text-xs text-fenalco-blue hover:underline font-medium">
               Ver todos →
             </a>
           </div>
@@ -460,15 +462,562 @@
       </div>
 
       <!-- ── PÁGINA: CARTERA ── -->
-      <div x-show="activePage === 'cartera'">
-        <div class="mb-6">
-          <h1 class="text-xl font-bold text-fenalco-purple">Cartera</h1>
-          <p class="text-fenalco-gray text-sm mt-0.5">Seguimiento de pagos y mora</p>
+      <section x-show="activePage === 'cartera'" x-data="carteraApp()" x-init="init()" @page-shown.window="onShow($event)" class="space-y-6">
+
+        <!-- Título + exportar -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-xl font-bold text-fenalco-purple">Gestión de Cartera</h1>
+            <p class="text-fenalco-gray text-sm mt-0.5">Control de mora, acuerdos y compromisos de pago</p>
+          </div>
+          <div class="relative" x-data="{ exportOpen: false }">
+            <button @click="exportOpen = !exportOpen" @click.outside="exportOpen = false"
+              :disabled="exportLoading"
+              class="flex items-center gap-1.5 border border-gray-300 text-fenalco-gray text-sm font-medium px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <svg x-show="!exportLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <svg x-show="exportLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+              <span x-text="exportLoading ? 'Exportando…' : 'Exportar'"></span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div x-show="exportOpen"
+              x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+              x-transition:leave="transition ease-in duration-75"  x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+              class="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20" style="display:none;">
+              <button @click="exportar('excel'); exportOpen = false"
+                class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">
+                <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1v5h5l-5-5zM8 13h8v1H8v-1zm0 2h8v1H8v-1zm0 2h5v1H8v-1z"/></svg>
+                Excel (.xlsx)
+              </button>
+              <button @click="exportar('pdf'); exportOpen = false"
+                class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">
+                <svg class="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 1v5h5l-5-5zM9 13h1.5c.8 0 1.5.7 1.5 1.5S11.3 16 10.5 16H10v1H9v-4zm1 2h.5c.3 0 .5-.2.5-.5s-.2-.5-.5-.5H10v1z"/></svg>
+                PDF (.pdf)
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-fenalco-gray text-sm">
-          Módulo en construcción
+
+        <!-- ── SECCIÓN 1: TARJETAS RESUMEN ── -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white rounded-xl border border-gray-200 p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+              </div>
+              <p class="text-xs font-semibold text-fenalco-gray uppercase tracking-wide">Total cartera en mora</p>
+            </div>
+            <p class="text-2xl font-bold text-red-600" x-text="resumenLoading ? '—' : fmtPeso(resumen.totalMora)"></p>
+            <p class="text-xs text-fenalco-gray mt-1">Saldo acumulado sin pagar</p>
+          </div>
+          <div class="bg-white rounded-xl border border-gray-200 p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              </div>
+              <p class="text-xs font-semibold text-fenalco-gray uppercase tracking-wide">Afiliados en mora</p>
+            </div>
+            <p class="text-2xl font-bold text-orange-600" x-text="resumenLoading ? '—' : resumen.countMora"></p>
+            <p class="text-xs text-fenalco-gray mt-1">Con días de mora activa</p>
+          </div>
+          <div class="bg-white rounded-xl border border-gray-200 p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              </div>
+              <p class="text-xs font-semibold text-fenalco-gray uppercase tracking-wide">Acuerdos de pago activos</p>
+            </div>
+            <p class="text-2xl font-bold text-amber-600" x-text="resumenLoading ? '—' : resumen.countAcuerdos"></p>
+            <p class="text-xs text-fenalco-gray mt-1">Con compromiso vigente</p>
+          </div>
         </div>
-      </div>
+
+        <!-- ── SECCIÓN 2: FILTROS ── -->
+        <div class="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row gap-3">
+          <div class="relative flex-1">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+            </span>
+            <input x-model="search" @input.debounce.400ms="page = 1; fetchCartera()" type="text"
+              placeholder="Buscar por razón social o NIT…"
+              class="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-blue/40 focus:border-fenalco-blue transition"/>
+            <button x-show="search" @click="search = ''; page = 1; fetchCartera()"
+              class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <select x-model="filtroCartera" @change="page = 1; fetchCartera()"
+            class="border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-fenalco-blue/40 text-fenalco-gray transition">
+            <option value="">Todos los estados</option>
+            <option value="en_mora">En mora</option>
+            <option value="acuerdo_pago">Acuerdo de pago</option>
+            <option value="suspendido">Suspendido</option>
+          </select>
+          <select x-model="filtroRango" @change="page = 1; fetchCartera()"
+            class="border border-gray-300 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-fenalco-blue/40 text-fenalco-gray transition">
+            <option value="">Todos los rangos</option>
+            <option value="0-30">0 – 30 días</option>
+            <option value="31-60">31 – 60 días</option>
+            <option value="61+">Más de 60 días</option>
+          </select>
+        </div>
+
+        <!-- ── SECCIÓN 3: TABLA PRINCIPAL ── -->
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-3 border-b border-gray-100">
+            <p class="text-sm font-medium text-fenalco-purple">
+              <span x-show="!loading" x-text="total + ' registros'"></span>
+              <span x-show="loading" class="text-fenalco-gray">Cargando...</span>
+            </p>
+          </div>
+
+          <!-- Loading skeleton -->
+          <div x-show="loading" class="divide-y divide-gray-100">
+            <template x-for="i in 5" :key="i">
+              <div class="flex items-center gap-4 px-6 py-4 animate-pulse">
+                <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+                <div class="h-4 bg-gray-200 rounded w-20 ml-4"></div>
+                <div class="h-6 bg-gray-200 rounded-full w-16 ml-4"></div>
+                <div class="h-4 bg-gray-200 rounded w-24 ml-auto"></div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Error -->
+          <div x-show="!loading && error" class="flex flex-col items-center justify-center py-16 text-red-500 gap-2">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p class="text-sm" x-text="error"></p>
+            <button @click="fetchCartera()" class="text-xs text-fenalco-blue hover:underline mt-1">Reintentar</button>
+          </div>
+
+          <!-- Tabla -->
+          <div x-show="!loading && !error" class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[900px]">
+              <thead>
+                <tr class="bg-gray-50 text-left text-fenalco-gray text-xs uppercase tracking-wide border-b border-gray-200">
+                  <th class="px-6 py-3 font-medium">Razón social</th>
+                  <th class="px-6 py-3 font-medium">NIT</th>
+                  <th class="px-6 py-3 font-medium">Días mora</th>
+                  <th class="px-6 py-3 font-medium text-right">Saldo pendiente</th>
+                  <th class="px-6 py-3 font-medium">Vencimiento</th>
+                  <th class="px-6 py-3 font-medium">Último contacto</th>
+                  <th class="px-6 py-3 font-medium">Responsable</th>
+                  <th class="px-6 py-3 font-medium text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr x-show="afiliados.length === 0">
+                  <td colspan="8" class="px-6 py-16 text-center">
+                    <div class="flex flex-col items-center gap-3 text-fenalco-gray">
+                      <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      <p class="text-sm font-medium">Sin registros de cartera</p>
+                      <p class="text-xs">Todos los afiliados están al día</p>
+                    </div>
+                  </td>
+                </tr>
+                <template x-for="a in afiliados" :key="a._id">
+                  <tr class="hover:bg-gray-50 transition-colors group">
+                    <td class="px-6 py-4">
+                      <p class="font-medium text-gray-800 group-hover:text-fenalco-purple transition-colors leading-tight" x-text="a.razonSocial"></p>
+                      <span :class="carteraBadge(a.estadoCartera).cls"
+                        class="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-xs font-medium">
+                        <span :class="carteraBadge(a.estadoCartera).dot" class="w-1 h-1 rounded-full"></span>
+                        <span x-text="carteraBadge(a.estadoCartera).label"></span>
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-fenalco-gray" x-text="a.nit"></td>
+                    <td class="px-6 py-4">
+                      <span :class="moraBadge(a.diasMora).cls"
+                        class="inline-block px-2.5 py-1 rounded-full text-xs font-bold"
+                        x-text="moraBadge(a.diasMora).label"></span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                      <span class="font-bold"
+                        :class="(a.saldoPendiente || 0) > 0 ? 'text-red-600' : 'text-gray-400'"
+                        x-text="(a.saldoPendiente || 0) > 0 ? fmtPeso(a.saldoPendiente) : '—'"></span>
+                    </td>
+                    <td class="px-6 py-4">
+                      <span :class="vencido(a.fechaVencimiento) ? 'text-red-600 font-semibold' : 'text-gray-600'"
+                        x-text="fmtFecha(a.fechaVencimiento)"></span>
+                    </td>
+                    <td class="px-6 py-4">
+                      <div x-show="a.ultimoContacto">
+                        <p class="text-gray-700 text-xs capitalize" x-text="a.ultimoContacto?.tipo || ''"></p>
+                        <p class="text-fenalco-gray text-xs mt-0.5" x-text="fmtFecha(a.ultimoContacto?.fecha)"></p>
+                      </div>
+                      <span x-show="!a.ultimoContacto" class="text-gray-400 text-xs">Sin registros</span>
+                    </td>
+                    <td class="px-6 py-4">
+                      <span x-show="a.ejecutivoAsignado"
+                        class="text-xs text-gray-700" x-text="a.ejecutivoAsignado?.nombre || '—'"></span>
+                      <span x-show="!a.ejecutivoAsignado" class="text-gray-400 text-xs">—</span>
+                    </td>
+                    <td class="px-6 py-4">
+                      <div class="flex items-center justify-center gap-1">
+                        <button @click="openContacto(a)" title="Registrar contacto"
+                          class="p-1.5 rounded-lg text-fenalco-gray hover:text-fenalco-green hover:bg-fenalco-green/10 transition-colors">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        </button>
+                        <button @click="openCompromiso(a)" title="Registrar compromiso de pago"
+                          class="p-1.5 rounded-lg text-fenalco-gray hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        </button>
+                        <button @click="openHistorial(a)" title="Ver historial completo"
+                          class="p-1.5 rounded-lg text-fenalco-gray hover:text-fenalco-purple hover:bg-fenalco-purple/10 transition-colors">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </button>
+                        <button x-show="a.estadoCartera !== 'al_dia'"
+                          @click="openPago(a)" title="Marcar pago recibido (al día)"
+                          class="p-1.5 rounded-lg text-fenalco-gray hover:text-fenalco-green hover:bg-fenalco-green/10 transition-colors">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Paginación -->
+          <div x-show="!loading && !error && totalPages > 1"
+            class="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+            <p class="text-xs text-fenalco-gray">Página <span x-text="page"></span> de <span x-text="totalPages"></span></p>
+            <div class="flex gap-2">
+              <button @click="changePage(page - 1)" :disabled="page <= 1"
+                class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors text-fenalco-gray">← Anterior</button>
+              <button @click="changePage(page + 1)" :disabled="page >= totalPages"
+                class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors text-fenalco-gray">Siguiente →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ MODAL: REGISTRAR CONTACTO ═══ -->
+        <div x-show="modalContacto"
+          x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+          class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+          @click.self="modalContacto = false" @keydown.escape.window="modalContacto = false" style="display:none;">
+          <div x-show="modalContacto"
+            x-transition:enter="transition-all duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition-all duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-md" @click.stop>
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <div>
+                <h2 class="font-bold text-fenalco-purple">Registrar contacto</h2>
+                <p class="text-fenalco-gray text-xs mt-0.5 truncate max-w-xs" x-text="contactoTarget.razonSocial"></p>
+              </div>
+              <button @click="modalContacto = false" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <form @submit.prevent="submitContacto" class="px-6 py-5 space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-fenalco-gray mb-2">Tipo de contacto</label>
+                <div class="grid grid-cols-4 gap-2">
+                  <template x-for="t in tiposContacto" :key="t.value">
+                    <button type="button" @click="contactoForm.tipo = t.value"
+                      :class="contactoForm.tipo === t.value ? 'border-fenalco-purple bg-fenalco-purple/5 text-fenalco-purple' : 'border-gray-200 text-fenalco-gray hover:border-gray-300'"
+                      class="flex flex-col items-center gap-1.5 p-2.5 border-2 rounded-xl text-xs font-medium transition-colors">
+                      <span x-html="t.icon" class="w-5 h-5"></span>
+                      <span x-text="t.label"></span>
+                    </button>
+                  </template>
+                </div>
+                <p x-show="contactoErrors.tipo" class="text-red-500 text-xs mt-1" x-text="contactoErrors.tipo"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-fenalco-gray mb-1.5">Descripción</label>
+                <textarea x-model="contactoForm.descripcion" rows="3" placeholder="Describe el contacto…"
+                  :class="contactoErrors.descripcion ? 'border-red-400' : 'border-gray-300 focus:ring-fenalco-blue/40 focus:border-fenalco-blue'"
+                  class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition resize-none"></textarea>
+                <p x-show="contactoErrors.descripcion" class="text-red-500 text-xs mt-1" x-text="contactoErrors.descripcion"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-fenalco-gray mb-1.5">Resultado <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <input x-model="contactoForm.resultado" type="text" placeholder="Ej: Acordó pago para el 30 de mayo"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-blue/40 focus:border-fenalco-blue transition"/>
+              </div>
+              <div x-show="contactoError" class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2.5">
+                <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                <span x-text="contactoError"></span>
+              </div>
+              <div x-show="contactoSuccess" class="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-3 py-2.5">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Contacto registrado correctamente
+              </div>
+              <div class="flex gap-3 pt-1">
+                <button type="submit" :disabled="contactoLoading || contactoSuccess"
+                  class="flex-1 bg-fenalco-green hover:bg-fenalco-green-hover disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm">
+                  <svg x-show="contactoLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  <span x-text="contactoLoading ? 'Guardando…' : 'Guardar contacto'"></span>
+                </button>
+                <button type="button" @click="modalContacto = false"
+                  class="px-4 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ═══ MODAL: REGISTRAR COMPROMISO DE PAGO ═══ -->
+        <div x-show="modalCompromiso"
+          x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+          class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+          @click.self="modalCompromiso = false" @keydown.escape.window="modalCompromiso = false" style="display:none;">
+          <div x-show="modalCompromiso"
+            x-transition:enter="transition-all duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition-all duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-md" @click.stop>
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <div>
+                <h2 class="font-bold text-fenalco-purple">Compromiso de pago</h2>
+                <p class="text-fenalco-gray text-xs mt-0.5 truncate max-w-xs" x-text="compromisoTarget.razonSocial"></p>
+              </div>
+              <button @click="modalCompromiso = false" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <form @submit.prevent="submitCompromiso" class="px-6 py-5 space-y-4">
+              <div x-show="(compromisoTarget.saldoPendiente || 0) > 0"
+                class="flex items-center justify-between bg-red-50 border border-red-100 rounded-lg px-4 py-3">
+                <span class="text-sm text-red-700 font-medium">Saldo pendiente actual</span>
+                <span class="text-red-700 font-bold" x-text="fmtPeso(compromisoTarget.saldoPendiente)"></span>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm font-medium text-fenalco-gray mb-1.5">Fecha compromiso <span class="text-red-500">*</span></label>
+                  <input x-model="compromisoForm.fechaCompromiso" type="date" :min="today"
+                    :class="compromisoErrors.fechaCompromiso ? 'border-red-400' : 'border-gray-300 focus:ring-fenalco-blue/40 focus:border-fenalco-blue'"
+                    class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition"/>
+                  <p x-show="compromisoErrors.fechaCompromiso" class="text-red-500 text-xs mt-1" x-text="compromisoErrors.fechaCompromiso"></p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-fenalco-gray mb-1.5">Monto (COP) <span class="text-red-500">*</span></label>
+                  <input x-model="compromisoForm.monto" type="number" min="1" step="1000" placeholder="0"
+                    :class="compromisoErrors.monto ? 'border-red-400' : 'border-gray-300 focus:ring-fenalco-blue/40 focus:border-fenalco-blue'"
+                    class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition"/>
+                  <p x-show="compromisoErrors.monto" class="text-red-500 text-xs mt-1" x-text="compromisoErrors.monto"></p>
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-fenalco-gray mb-1.5">Descripción <span class="text-gray-400 font-normal">(opcional)</span></label>
+                <textarea x-model="compromisoForm.descripcion" rows="2" placeholder="Ej: Pago cuotas atrasadas en dos abonos…"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-blue/40 focus:border-fenalco-blue transition resize-none"></textarea>
+              </div>
+              <div class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-xs text-amber-700">
+                Al guardar, el estado de cartera cambiará automáticamente a <strong>Acuerdo de pago</strong>.
+              </div>
+              <div x-show="compromisoError" class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2.5">
+                <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                <span x-text="compromisoError"></span>
+              </div>
+              <div x-show="compromisoSuccess" class="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-3 py-2.5">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Compromiso registrado correctamente
+              </div>
+              <div class="flex gap-3 pt-1">
+                <button type="submit" :disabled="compromisoLoading || compromisoSuccess"
+                  class="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm">
+                  <svg x-show="compromisoLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  <span x-text="compromisoLoading ? 'Guardando…' : 'Registrar compromiso'"></span>
+                </button>
+                <button type="button" @click="modalCompromiso = false"
+                  class="px-4 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ═══ PANEL: HISTORIAL COMPLETO (deslizable derecha) ═══ -->
+        <div x-show="modalHistorial"
+          x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+          class="fixed inset-0 bg-black/50 z-40 flex items-start justify-end"
+          @keydown.escape.window="modalHistorial = false" style="display:none;">
+          <div x-show="modalHistorial"
+            x-transition:enter="transition-transform duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+            x-transition:leave="transition-transform duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+            class="relative bg-white w-full max-w-lg h-full overflow-y-auto shadow-2xl flex flex-col" @click.stop>
+            <div class="bg-fenalco-purple px-6 py-5 flex items-start justify-between flex-shrink-0">
+              <div>
+                <p class="text-white/60 text-xs uppercase tracking-wide mb-1">Historial de cartera</p>
+                <h2 class="text-white font-bold text-lg leading-tight" x-text="historialData.razonSocial || '—'"></h2>
+                <div class="flex items-center gap-2 mt-2">
+                  <span x-show="historialData.estadoCartera" :class="carteraBadge(historialData.estadoCartera).cls"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium">
+                    <span :class="carteraBadge(historialData.estadoCartera).dot" class="w-1.5 h-1.5 rounded-full"></span>
+                    <span x-text="carteraBadge(historialData.estadoCartera).label"></span>
+                  </span>
+                  <span :class="moraBadge(historialData.diasMora || 0).cls"
+                    class="px-2 py-0.5 rounded-full text-xs font-semibold"
+                    x-text="moraBadge(historialData.diasMora || 0).label"></span>
+                </div>
+              </div>
+              <button @click="modalHistorial = false" class="text-white/60 hover:text-white transition-colors p-1 mt-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div x-show="historialLoading" class="flex-1 flex items-center justify-center">
+              <svg class="animate-spin w-7 h-7 text-fenalco-purple" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            </div>
+            <div x-show="!historialLoading" class="flex-1 px-6 py-5 space-y-6">
+              <section>
+                <h3 class="text-xs font-semibold text-fenalco-gray uppercase tracking-wide mb-3 pb-1.5 border-b border-gray-100">Resumen financiero</h3>
+                <dl class="grid grid-cols-3 gap-3 text-sm">
+                  <div class="bg-gray-50 rounded-lg p-3 text-center">
+                    <dt class="text-fenalco-gray text-xs">Membresía</dt>
+                    <dd class="font-bold text-fenalco-purple mt-1" x-text="fmtPeso(historialData.valorMembresia)"></dd>
+                  </div>
+                  <div class="bg-gray-50 rounded-lg p-3 text-center">
+                    <dt class="text-fenalco-gray text-xs">Cuota mensual</dt>
+                    <dd class="font-bold text-fenalco-purple mt-1" x-text="fmtPeso(historialData.cuotaMensual)"></dd>
+                  </div>
+                  <div class="rounded-lg p-3 text-center" :class="(historialData.saldoPendiente || 0) > 0 ? 'bg-red-50' : 'bg-gray-50'">
+                    <dt class="text-fenalco-gray text-xs">Saldo pendiente</dt>
+                    <dd class="font-bold mt-1" :class="(historialData.saldoPendiente || 0) > 0 ? 'text-red-600' : 'text-gray-400'"
+                      x-text="fmtPeso(historialData.saldoPendiente)"></dd>
+                  </div>
+                </dl>
+              </section>
+              <section>
+                <div class="flex items-center justify-between mb-3 pb-1.5 border-b border-gray-100">
+                  <h3 class="text-xs font-semibold text-fenalco-gray uppercase tracking-wide">Compromisos de pago</h3>
+                  <button @click="openCompromiso(historialData)"
+                    class="text-xs text-amber-600 hover:underline font-medium flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Nuevo
+                  </button>
+                </div>
+                <div x-show="!historialData.compromisos || historialData.compromisos.length === 0"
+                  class="text-center py-4 text-fenalco-gray text-xs">Sin compromisos registrados</div>
+                <div class="space-y-2">
+                  <template x-for="(c, idx) in historialData.compromisos || []" :key="c._id">
+                    <div class="flex items-center justify-between rounded-lg px-3 py-2.5 border"
+                      :class="c.cumplido ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'">
+                      <div>
+                        <p class="text-sm font-semibold" :class="c.cumplido ? 'text-green-800' : 'text-amber-800'" x-text="fmtPeso(c.monto)"></p>
+                        <p class="text-xs mt-0.5" :class="c.cumplido ? 'text-green-700' : 'text-amber-700'">Para el <span x-text="fmtFecha(c.fechaCompromiso)"></span></p>
+                        <p x-show="c.descripcion" class="text-xs mt-0.5 italic" :class="c.cumplido ? 'text-green-600' : 'text-amber-600'" x-text="c.descripcion"></p>
+                      </div>
+                      <div class="flex items-center gap-1.5 flex-shrink-0">
+                        <span :class="c.cumplido ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+                          class="text-xs font-medium px-2 py-0.5 rounded-full"
+                          x-text="c.cumplido ? 'Cumplido' : 'Pendiente'"></span>
+                        <button x-show="!c.cumplido"
+                          @click="cumplirCompromiso(historialData._id, c._id, c)"
+                          title="Marcar como cumplido"
+                          class="w-6 h-6 flex items-center justify-center rounded-full bg-green-100 hover:bg-green-200 text-green-700 transition-colors">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </section>
+              <section>
+                <div class="flex items-center justify-between mb-3 pb-1.5 border-b border-gray-100">
+                  <h3 class="text-xs font-semibold text-fenalco-gray uppercase tracking-wide">Historial de contacto</h3>
+                  <button @click="openContacto(historialData)"
+                    class="text-xs text-fenalco-green hover:underline font-medium flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Registrar
+                  </button>
+                </div>
+                <div x-show="!historialData.interacciones || historialData.interacciones.length === 0"
+                  class="text-center py-4 text-fenalco-gray text-xs">Sin registros de contacto</div>
+                <div class="space-y-3">
+                  <template x-for="(inter, idx) in historialData.interacciones || []" :key="idx">
+                    <div class="flex gap-3">
+                      <div class="flex flex-col items-center">
+                        <div :class="tipoIcon(inter.tipo).bg" class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span x-html="tipoIcon(inter.tipo).svg" class="w-3.5 h-3.5"></span>
+                        </div>
+                        <div x-show="idx < (historialData.interacciones?.length || 0) - 1" class="w-px flex-1 bg-gray-200 my-1"></div>
+                      </div>
+                      <div class="flex-1 pb-2">
+                        <div class="flex items-center justify-between">
+                          <span :class="tipoIcon(inter.tipo).label_cls" class="text-xs font-semibold capitalize" x-text="inter.tipo"></span>
+                          <span class="text-fenalco-gray text-xs" x-text="fmtFechaHora(inter.fecha)"></span>
+                        </div>
+                        <p class="text-sm text-gray-700 mt-0.5" x-text="inter.descripcion"></p>
+                        <p x-show="inter.resultado" class="text-xs text-fenalco-gray mt-0.5 italic" x-text="'Resultado: ' + inter.resultado"></p>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </section>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+              <button @click="openCompromiso(historialData)"
+                class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                Nuevo compromiso
+              </button>
+              <button @click="modalHistorial = false"
+                class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">Cerrar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ MODAL: CONFIRMAR PAGO RECIBIDO ═══ -->
+        <div x-show="modalPago"
+          x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+          class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+          @click.self="modalPago = false" @keydown.escape.window="modalPago = false" style="display:none;">
+          <div x-show="modalPago"
+            x-transition:enter="transition-all duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition-all duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-sm" @click.stop>
+            <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <div>
+                <h2 class="font-bold text-fenalco-purple">Registrar pago recibido</h2>
+                <p class="text-fenalco-gray text-xs mt-0.5 truncate max-w-xs" x-text="pagoTarget.razonSocial"></p>
+              </div>
+              <button @click="modalPago = false" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+              <div class="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
+                <p class="text-xs font-semibold text-green-800 uppercase tracking-wide">Al confirmar se aplicará:</p>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-green-700">Estado cartera</span>
+                  <span class="font-semibold text-green-800">→ Al día</span>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-green-700">Días en mora</span>
+                  <span class="font-semibold text-green-800">→ 0</span>
+                </div>
+                <div x-show="(pagoTarget.saldoPendiente || 0) > 0" class="flex items-center justify-between text-sm">
+                  <span class="text-green-700">Saldo pendiente</span>
+                  <span class="font-semibold text-green-800">
+                    <span x-text="fmtPeso(pagoTarget.saldoPendiente)"></span> → $ 0
+                  </span>
+                </div>
+              </div>
+              <p class="text-xs text-fenalco-gray">
+                Esta acción registra el pago total de la deuda. Para pagos parciales, usa <strong>Compromiso de pago</strong>.
+              </p>
+              <div x-show="pagoError" class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2.5">
+                <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                <span x-text="pagoError"></span>
+              </div>
+              <div class="flex gap-3 pt-1">
+                <button @click="confirmarPago()" :disabled="pagoLoading"
+                  class="flex-1 bg-fenalco-green hover:bg-fenalco-green-hover disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm">
+                  <svg x-show="pagoLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  <svg x-show="!pagoLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  <span x-text="pagoLoading ? 'Guardando…' : 'Confirmar pago'"></span>
+                </button>
+                <button type="button" @click="modalPago = false"
+                  class="px-4 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50 transition-colors">Cancelar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
 
       <!-- ── PÁGINA: REPORTES ── -->
       <section x-show="activePage === 'reportes'" x-data="reportesApp()" x-init="init()" @page-shown.window="onShow($event)">
@@ -695,7 +1244,7 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-4 mt-2">
-                  <a x-show="n.afiliado" href="/cartera.html"
+                  <a x-show="n.afiliado" href="/dashboard.html#cartera"
                     class="inline-flex items-center gap-1 text-xs text-fenalco-blue hover:underline">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
@@ -1411,7 +1960,6 @@
 
         goTo(id) {
           if (id === 'afiliados')  { window.location.href = '/afiliados.html'; return; }
-          if (id === 'cartera')    { window.location.href = '/cartera.html'; return; }
           this.activePage = id;
           this.sidebarOpen = false;
           if (id === 'notificaciones') {
@@ -1963,6 +2511,310 @@
       };
     }
 
+    function carteraApp() {
+      return {
+        token: localStorage.getItem('crm_token'),
+        role: localStorage.getItem('crm_role') || '',
+        today: new Date().toISOString().split('T')[0],
+
+        // resumen
+        resumenLoading: true,
+        resumen: { totalMora: 0, countMora: 0, countAcuerdos: 0 },
+
+        // tabla
+        afiliados: [], total: 0, page: 1, limit: 50,
+        loading: true, error: '', loaded: false,
+        search: '', filtroCartera: '', filtroRango: '',
+
+        // modal contacto
+        modalContacto: false,
+        contactoTarget: {},
+        contactoForm: { tipo: '', descripcion: '', resultado: '' },
+        contactoErrors: {}, contactoLoading: false, contactoError: '', contactoSuccess: false,
+
+        // modal compromiso
+        modalCompromiso: false,
+        compromisoTarget: {},
+        compromisoForm: { fechaCompromiso: '', monto: '', descripcion: '' },
+        compromisoErrors: {}, compromisoLoading: false, compromisoError: '', compromisoSuccess: false,
+
+        // exportar
+        exportLoading: false,
+
+        // panel historial
+        modalHistorial: false,
+        historialData: {},
+        historialLoading: false,
+
+        // modal pago recibido
+        modalPago: false,
+        pagoTarget: {},
+        pagoLoading: false,
+        pagoError: '',
+
+        tiposContacto: [
+          { value: 'llamada',   label: 'Llamada',  icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>' },
+          { value: 'email',    label: 'Correo',   icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>' },
+          { value: 'visita',   label: 'Visita',   icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' },
+          { value: 'whatsapp', label: 'WhatsApp', icon: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>' },
+        ],
+
+        get totalPages() { return Math.ceil(this.total / this.limit) || 1; },
+
+        init() {
+          // Carga diferida: el shell despacha 'page-shown' al navegar a cartera.
+        },
+
+        onShow(e) {
+          if (e.detail?.page !== 'cartera') return;
+          if (!this.loaded) {
+            this.loaded = true;
+            Promise.all([this.fetchResumen(), this.fetchCartera()]);
+          }
+        },
+
+        async fetchResumen() {
+          this.resumenLoading = true;
+          try {
+            const res = await fetch('/api/afiliados/cartera/resumen', {
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            if (res.ok) { this.resumen = await res.json(); }
+          } catch {}
+          finally { this.resumenLoading = false; }
+        },
+
+        async fetchCartera() {
+          this.loading = true; this.error = '';
+          try {
+            const params = new URLSearchParams({ page: this.page, limit: this.limit });
+            if (this.search)        params.set('search', this.search);
+            if (this.filtroCartera) params.set('estadoCartera', this.filtroCartera);
+            if (this.filtroRango)   params.set('rangoDias', this.filtroRango);
+            const res = await fetch(`/api/afiliados/cartera/lista?${params}`, {
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            this.afiliados = data.afiliados;
+            this.total = data.total;
+          } catch { this.error = 'No se pudo cargar la cartera'; }
+          finally { this.loading = false; }
+        },
+
+        openContacto(a) {
+          this.contactoTarget = a;
+          this.contactoForm = { tipo: '', descripcion: '', resultado: '' };
+          this.contactoErrors = {}; this.contactoError = ''; this.contactoSuccess = false;
+          this.modalContacto = true;
+        },
+
+        async submitContacto() {
+          this.contactoErrors = {};
+          if (!this.contactoForm.tipo) this.contactoErrors.tipo = 'Selecciona un tipo';
+          if (!this.contactoForm.descripcion.trim()) this.contactoErrors.descripcion = 'La descripción es obligatoria';
+          if (Object.keys(this.contactoErrors).length) return;
+          this.contactoLoading = true; this.contactoError = '';
+          try {
+            const res = await fetch(`/api/afiliados/${this.contactoTarget._id}/contacto`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+              body: JSON.stringify(this.contactoForm),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al guardar');
+            this.contactoSuccess = true;
+            await this.fetchCartera();
+            setTimeout(() => { this.modalContacto = false; }, 1400);
+          } catch (err) { this.contactoError = err.message; }
+          finally { this.contactoLoading = false; }
+        },
+
+        openCompromiso(a) {
+          this.compromisoTarget = a;
+          this.compromisoForm = { fechaCompromiso: '', monto: '', descripcion: '' };
+          this.compromisoErrors = {}; this.compromisoError = ''; this.compromisoSuccess = false;
+          this.modalCompromiso = true;
+        },
+
+        async submitCompromiso() {
+          this.compromisoErrors = {};
+          if (!this.compromisoForm.fechaCompromiso) this.compromisoErrors.fechaCompromiso = 'Requerido';
+          if (!this.compromisoForm.monto || Number(this.compromisoForm.monto) <= 0) this.compromisoErrors.monto = 'Ingresa un monto válido';
+          if (Object.keys(this.compromisoErrors).length) return;
+          this.compromisoLoading = true; this.compromisoError = '';
+          try {
+            const res = await fetch(`/api/afiliados/${this.compromisoTarget._id}/compromiso`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+              body: JSON.stringify(this.compromisoForm),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al guardar');
+            this.compromisoSuccess = true;
+            await Promise.all([this.fetchResumen(), this.fetchCartera()]);
+            setTimeout(() => { this.modalCompromiso = false; }, 1400);
+          } catch (err) { this.compromisoError = err.message; }
+          finally { this.compromisoLoading = false; }
+        },
+
+        async openHistorial(a) {
+          this.historialData = { ...a, interacciones: a.historialReciente || [] };
+          this.modalHistorial = true;
+          this.historialLoading = true;
+          try {
+            const res = await fetch(`/api/afiliados/${a._id}`, {
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) { const d = await res.json(); this.historialData = d.afiliado; }
+          } catch {}
+          finally { this.historialLoading = false; }
+        },
+
+        changePage(n) {
+          if (n < 1 || n > this.totalPages) return;
+          this.page = n; this.fetchCartera();
+        },
+
+        openPago(a) {
+          this.pagoTarget = a;
+          this.pagoError = '';
+          this.modalPago = true;
+        },
+
+        async confirmarPago() {
+          this.pagoLoading = true;
+          this.pagoError = '';
+          try {
+            const res = await fetch(`/api/afiliados/${this.pagoTarget._id}/pago-recibido`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al registrar pago');
+            this.modalPago = false;
+            this.afiliados = this.afiliados.filter(a => a._id !== this.pagoTarget._id);
+            this.total = Math.max(0, this.total - 1);
+            await this.fetchResumen();
+          } catch (err) { this.pagoError = err.message; }
+          finally { this.pagoLoading = false; }
+        },
+
+        async cumplirCompromiso(afiliadoId, compromisoId, obj) {
+          try {
+            const res = await fetch(`/api/afiliados/${afiliadoId}/compromisos/${compromisoId}`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) obj.cumplido = true;
+          } catch {}
+        },
+
+        async exportar(formato) {
+          this.exportLoading = true;
+          try {
+            const params = new URLSearchParams();
+            if (this.search)        params.set('search', this.search);
+            if (this.filtroCartera) params.set('estadoCartera', this.filtroCartera);
+            if (this.filtroRango)   params.set('rangoDias', this.filtroRango);
+
+            if (formato === 'excel') {
+              const res = await fetch(`/api/afiliados/cartera/export/excel?${params}`, {
+                headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+              });
+              if (!res.ok) throw new Error('Error al exportar');
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = 'cartera.xlsx';
+              document.body.appendChild(a); a.click(); document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } else {
+              params.set('limit', '9999');
+              const res = await fetch(`/api/afiliados/cartera/lista?${params}`, {
+                headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+              });
+              const data = await res.json();
+              const { jsPDF } = window.jspdf;
+              const doc = new jsPDF({ orientation: 'landscape', unit: 'mm' });
+              const hoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+              doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 0, 113);
+              doc.text('Fenalco — Gestión de Cartera', 14, 14);
+              doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(72, 73, 84);
+              doc.text(`Generado: ${hoy}  ·  Total: ${data.afiliados.length} registros`, 14, 20);
+              const carteraLabel = { al_dia: 'Al día', en_mora: 'En mora', acuerdo_pago: 'Acuerdo pago', suspendido: 'Suspendido' };
+              const fmt = v => v ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v) : '$0';
+              doc.autoTable({
+                startY: 25,
+                head: [['Razón social', 'NIT', 'Estado cartera', 'Días mora', 'Saldo pendiente', 'Vencimiento', 'Ejecutivo']],
+                body: data.afiliados.map(a => [
+                  a.razonSocial, a.nit,
+                  carteraLabel[a.estadoCartera] || a.estadoCartera,
+                  a.diasMora || 0, fmt(a.saldoPendiente),
+                  a.fechaVencimiento ? new Date(a.fechaVencimiento).toLocaleDateString('es-CO') : '—',
+                  a.ejecutivoAsignado?.nombre || '—',
+                ]),
+                styles: { fontSize: 7, cellPadding: 2 },
+                headStyles: { fillColor: [40, 0, 113], textColor: 255, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 28 }, 3: { halign: 'center' }, 4: { halign: 'right' } },
+              });
+              doc.save('cartera.pdf');
+            }
+          } catch (err) { console.error('exportar:', err); }
+          finally { this.exportLoading = false; }
+        },
+
+        // ── helpers visuales ──
+        moraBadge(dias) {
+          if (!dias || dias === 0) return { label: 'Al día',       cls: 'bg-green-100 text-green-700' };
+          if (dias <= 30)          return { label: dias + ' días', cls: 'bg-yellow-100 text-yellow-700' };
+          if (dias <= 60)          return { label: dias + ' días', cls: 'bg-orange-100 text-orange-700' };
+          return                          { label: dias + ' días', cls: 'bg-red-100 text-red-700' };
+        },
+
+        carteraBadge(cartera) {
+          const map = {
+            al_dia:       { label: 'Al día',          dot: 'bg-[#00CE7C]', cls: 'bg-[#00CE7C]/10 text-[#009955]' },
+            en_mora:      { label: 'En mora',          dot: 'bg-red-500',   cls: 'bg-red-50 text-red-600' },
+            acuerdo_pago: { label: 'Acuerdo de pago', dot: 'bg-amber-400', cls: 'bg-amber-50 text-amber-700' },
+            suspendido:   { label: 'Suspendido',       dot: 'bg-gray-400',  cls: 'bg-gray-100 text-gray-600' },
+          };
+          return map[cartera] || { label: cartera || '—', dot: 'bg-gray-300', cls: 'bg-gray-100 text-gray-500' };
+        },
+
+        tipoIcon(tipo) {
+          const map = {
+            llamada:   { bg: 'bg-blue-100',   label_cls: 'text-blue-700',   svg: '<svg fill="none" stroke="#1d4ed8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>' },
+            email:     { bg: 'bg-purple-100', label_cls: 'text-purple-700', svg: '<svg fill="none" stroke="#7e22ce" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>' },
+            visita:    { bg: 'bg-amber-100',  label_cls: 'text-amber-700',  svg: '<svg fill="none" stroke="#b45309" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>' },
+            whatsapp:  { bg: 'bg-green-100',  label_cls: 'text-green-700',  svg: '<svg fill="#16a34a" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>' },
+            reunion:   { bg: 'bg-gray-100',   label_cls: 'text-gray-600',   svg: '<svg fill="none" stroke="#4b5563" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' },
+          };
+          return map[tipo] || map.reunion;
+        },
+
+        fmtFecha(d) {
+          if (!d) return '—';
+          return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+        },
+        fmtFechaHora(d) {
+          if (!d) return '';
+          return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        },
+        fmtPeso(v) {
+          if (v == null || v === undefined) return '—';
+          return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v);
+        },
+        vencido(d) { return d && new Date(d) < new Date(); },
+      };
+    }
+
     function notifBell() {
       return {
         open: false,
@@ -2008,7 +2860,7 @@
               headers: { Authorization: `Bearer ${this._token}` }, credentials: 'include',
             });
           }
-          if (n.afiliado) window.location.href = '/cartera.html';
+          if (n.afiliado) window.location.href = '/dashboard.html#cartera';
         },
 
         async leerTodas() {
