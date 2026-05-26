@@ -186,4 +186,69 @@ router.delete('/:id', protect, authorize('admin', 'ejecutivo'), async (req, res)
   } catch (e) { res.status(500).json({ message: 'No se pudo eliminar el inscrito.' }); }
 });
 
+// ── Importación CSV ──────────────────────────────────────────────────────────
+const xlsx = require('xlsx');
+
+// Normaliza encabezados del CSV a las llaves internas conocidas.
+const MAPEO_COL = {
+  nombre:'nombre', nombres:'nombre', apellido:'apellido', apellidos:'apellido',
+  empresa:'empresa', razonsocial:'empresa', 'razon social':'empresa',
+  cargo:'cargo', cedula:'cedula', documento:'cedula', cc:'cedula',
+  nit:'nit', telefono:'telefono', celular:'telefono', email:'email', correo:'email',
+  codigo:'codigo', estado:'estado', hora:'horaCheckin', horacheckin:'horaCheckin', observaciones:'observaciones',
+};
+const normCol = (h) => String(h || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+// POST  importar  body: { csv: "<texto>" }
+router.post('/importar', protect, authorize('admin', 'ejecutivo'), async (req, res) => {
+  try {
+    const evento = await getEvento(req);
+    const csv = req.body && req.body.csv;
+    if (!csv || !String(csv).trim()) return res.status(400).json({ message: 'No se recibió contenido CSV.' });
+
+    const wb = xlsx.read(String(csv), { type: 'string' });
+    const hoja = wb.Sheets[wb.SheetNames[0]];
+    const filasRaw = xlsx.utils.sheet_to_json(hoja, { defval: '' });
+    if (!filasRaw.length) return res.status(400).json({ message: 'El CSV no tiene filas.' });
+
+    // Renombrar columnas según MAPEO_COL
+    const filas = filasRaw.map((r) => {
+      const o = {};
+      Object.keys(r).forEach((k) => { const dest = MAPEO_COL[normCol(k)]; if (dest) o[dest] = r[k]; });
+      return o;
+    }).filter((r) => r.nombre && String(r.nombre).trim());
+
+    let creados = 0, actualizados = 0;
+    const errores = [];
+    for (let idx = 0; idx < filas.length; idx++) {
+      const f = filas[idx];
+      try {
+        const cedulaNorm = soloDigitos(f.cedula);
+        const { afiliado, tipoAfiliacion } = await resolverAfiliado(f.nit, f.empresa);
+        const estado = normalizar(f.estado) === 'asistio' ? 'asistio' : 'inscrito';
+        const datos = {
+          evento: evento._id,
+          nombre: f.nombre, apellido: f.apellido, cedula: f.cedula, cargo: f.cargo,
+          empresa: f.empresa, email: f.email, telefono: f.telefono, codigo: f.codigo,
+          afiliado, tipoAfiliacion, estado, origen: 'importacion',
+          horaCheckin: estado === 'asistio' ? (f.horaCheckin ? new Date(f.horaCheckin) : new Date()) : undefined,
+          observaciones: f.observaciones,
+        };
+        // dedup por cédula dentro del evento (si hay cédula)
+        let existente = null;
+        if (cedulaNorm) existente = await Inscrito.findOne({ evento: evento._id, cedulaNorm });
+        if (existente) {
+          Object.assign(existente, datos);
+          await existente.save();
+          actualizados++;
+        } else {
+          await new Inscrito(datos).save();
+          creados++;
+        }
+      } catch (e) { errores.push({ fila: idx + 2, motivo: e.message }); }
+    }
+    res.json({ creados, actualizados, errores, totalFilas: filas.length });
+  } catch (e) { res.status(e.status || 500).json({ message: e.message || 'No se pudo importar el CSV.' }); }
+});
+
 module.exports = router;
