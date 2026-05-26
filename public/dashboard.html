@@ -2948,6 +2948,8 @@
       <!-- ═══════════════ EVENTOS (catálogo) ═══════════════ -->
       <section x-show="activePage === 'eventos'" x-data="eventosApp()" x-init="init()" @page-shown.window="onShow($event)" class="space-y-6">
 
+        <div x-show="vista === 'lista'" class="space-y-6">
+
         <!-- Encabezado -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -3025,6 +3027,7 @@
                     </td>
                     <td class="px-4 py-3">
                       <div class="flex items-center justify-end gap-2">
+                        <button @click="abrirDetalle(ev)" class="text-fenalco-purple hover:underline text-xs font-medium">Ver inscritos</button>
                         <button x-show="puedeEditar" @click="openEditar(ev)" class="text-fenalco-blue hover:underline text-xs font-medium">Editar</button>
                         <button x-show="puedeEliminar" @click="confirmarEliminar(ev)" class="text-red-600 hover:underline text-xs font-medium">Eliminar</button>
                       </div>
@@ -3044,6 +3047,82 @@
               class="px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40">Siguiente</button>
           </div>
         </div>
+
+        </div><!-- /vista lista -->
+
+        <!-- ░░ DETALLE DE EVENTO + INSCRITOS ░░ -->
+        <div x-show="vista === 'detalle'" class="space-y-6">
+          <button @click="vista = 'lista'; eventoActivo = null" class="text-sm text-fenalco-blue hover:underline">← Volver al catálogo</button>
+
+          <div class="bg-white rounded-2xl shadow-sm p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 class="text-lg font-bold text-fenalco-purple" x-text="eventoActivo?.nombre"></h2>
+                <p class="text-sm text-fenalco-gray" x-text="fmtFecha(eventoActivo?.fechaInicio) + (eventoActivo?.lugar ? ' · ' + eventoActivo.lugar : '')"></p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button x-show="puedeEditar" @click="$refs.csvFile.click()" class="inline-flex items-center gap-2 px-4 py-2 border border-fenalco-purple text-fenalco-purple text-sm font-semibold rounded-lg hover:bg-fenalco-purple/5">Importar CSV</button>
+                <input type="file" x-ref="csvFile" accept=".csv,text/csv" class="hidden" @change="importarCSV($event)">
+                <button x-show="puedeEditar" @click="openNuevoInscrito()"
+                  class="inline-flex items-center gap-2 px-4 py-2 bg-fenalco-purple hover:bg-fenalco-purple/90 text-white text-sm font-semibold rounded-lg">
+                  + Inscribir persona
+                </button>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-fenalco-gray">Inscritos</p><p class="text-xl font-bold text-fenalco-purple" x-text="resumen.total"></p></div>
+              <div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-fenalco-gray">Asistieron</p><p class="text-xl font-bold text-fenalco-green" x-text="resumen.asistio"></p></div>
+              <div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-fenalco-gray">Pendientes</p><p class="text-xl font-bold text-fenalco-gray" x-text="resumen.pendientes"></p></div>
+              <div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-fenalco-gray">Empresas</p><p class="text-xl font-bold text-fenalco-blue" x-text="resumen.empresas"></p></div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-3">
+            <input type="text" x-model="inscBuscar" @input.debounce.400ms="fetchInscritos()" placeholder="Buscar por nombre, empresa, cédula o código..."
+              class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+            <select x-model="inscFiltroEstado" @change="fetchInscritos()" class="border border-gray-200 rounded-lg text-sm px-3 py-2">
+              <option value="">Todos</option>
+              <option value="inscrito">Inscrito</option>
+              <option value="asistio">Asistió</option>
+              <option value="no_asistio">No asistió</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div x-show="inscLoading" class="p-8 text-center text-fenalco-gray text-sm">Cargando inscritos...</div>
+            <div x-show="!inscLoading && inscritos2.length === 0" class="p-12 text-center text-fenalco-gray text-sm">Sin inscritos registrados</div>
+            <div x-show="!inscLoading && inscritos2.length > 0" class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-fenalco-gray text-xs uppercase">
+                  <tr>
+                    <th class="text-left px-4 py-3">Nombre</th><th class="text-left px-4 py-3">Empresa</th>
+                    <th class="text-left px-4 py-3">Cargo</th><th class="text-left px-4 py-3">Afiliación</th>
+                    <th class="text-left px-4 py-3">Estado</th><th class="text-right px-4 py-3">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="i in inscritos2" :key="i._id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3"><p class="font-medium text-gray-800" x-text="(i.nombre||'') + ' ' + (i.apellido||'')"></p><p class="text-xs text-fenalco-gray" x-text="i.cedula || ''"></p></td>
+                      <td class="px-4 py-3 text-fenalco-gray" x-text="i.empresa || (i.afiliado?.razonSocial) || '—'"></td>
+                      <td class="px-4 py-3 text-fenalco-gray" x-text="i.cargo || '—'"></td>
+                      <td class="px-4 py-3"><span :class="afiliacionBadge(i.tipoAfiliacion).cls" class="px-2 py-0.5 rounded-full text-xs font-medium" x-text="afiliacionBadge(i.tipoAfiliacion).label"></span></td>
+                      <td class="px-4 py-3"><span :class="inscEstadoBadge(i.estado).cls" class="px-2 py-0.5 rounded-full text-xs font-medium" x-text="inscEstadoBadge(i.estado).label"></span></td>
+                      <td class="px-4 py-3">
+                        <div class="flex items-center justify-end gap-2">
+                          <button x-show="puedeEditar && i.estado !== 'asistio'" @click="checkin(i)" class="text-fenalco-green hover:underline text-xs font-medium">Check-in</button>
+                          <button x-show="puedeEditar" @click="openEditarInscrito(i)" class="text-fenalco-blue hover:underline text-xs font-medium">Editar</button>
+                          <button x-show="puedeEditar" @click="eliminarInscrito(i)" class="text-red-600 hover:underline text-xs font-medium">Eliminar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div><!-- /vista detalle -->
 
         <!-- ═══ MODAL: CREAR / EDITAR ═══ -->
         <div x-show="modalForm"
@@ -3144,6 +3223,46 @@
                 class="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg">
                 <span x-text="eliminarLoading ? 'Eliminando…' : 'Sí, eliminar'"></span>
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ MODAL: INSCRITO (alta / edición) ═══ -->
+        <div x-show="modalInsc" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          @click.self="modalInsc = false" @keydown.escape.window="modalInsc = false" style="display:none;">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4" @click.stop>
+            <h3 class="font-bold text-fenalco-purple text-lg" x-text="inscEditId ? 'Editar inscrito' : 'Inscribir persona'"></h3>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Nombre *</label><input type="text" x-model="inscForm.nombre" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Apellido</label><input type="text" x-model="inscForm.apellido" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Cédula</label><input type="text" x-model="inscForm.cedula" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Cargo</label><input type="text" x-model="inscForm.cargo" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Empresa</label><input type="text" x-model="inscForm.empresa" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">NIT (para vincular afiliado)</label><input type="text" x-model="inscForm.nit" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Correo</label><input type="email" x-model="inscForm.email" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Teléfono</label><input type="text" x-model="inscForm.telefono" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div>
+                <label class="block text-xs font-medium text-fenalco-gray mb-1">Tipo de afiliación</label>
+                <select x-model="inscForm.tipoAfiliacion" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Auto (según vínculo)</option>
+                  <option value="afiliado">Afiliado Fenalco</option>
+                  <option value="no_afiliado">No afiliado</option>
+                  <option value="emprendedor">Emprendedor</option>
+                  <option value="mixto">Mixto</option>
+                </select>
+              </div>
+              <div x-show="inscEditId">
+                <label class="block text-xs font-medium text-fenalco-gray mb-1">Estado</label>
+                <select x-model="inscForm.estado" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="inscrito">Inscrito</option><option value="asistio">Asistió</option>
+                  <option value="no_asistio">No asistió</option><option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+            </div>
+            <div x-show="inscFormError" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2.5" x-text="inscFormError"></div>
+            <div class="flex gap-3 justify-end">
+              <button @click="modalInsc = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50">Cancelar</button>
+              <button @click="submitInscrito()" :disabled="inscFormLoading" class="px-4 py-2 bg-fenalco-purple hover:bg-fenalco-purple/90 disabled:opacity-60 text-white text-sm font-semibold rounded-lg" x-text="inscFormLoading ? 'Guardando…' : 'Guardar'"></button>
             </div>
           </div>
         </div>
@@ -3436,6 +3555,20 @@
         eliminarError: '',
         eliminarLoading: false,
 
+        // ── estado de detalle/inscritos (paso 8) ──
+        vista: 'lista',
+        eventoActivo: null,
+        resumen: { total: 0, asistio: 0, pendientes: 0, empresas: 0 },
+        inscritos2: [],
+        inscLoading: false,
+        inscBuscar: '',
+        inscFiltroEstado: '',
+        modalInsc: false,
+        inscEditId: null,
+        inscForm: {},
+        inscFormError: '',
+        inscFormLoading: false,
+
         tipos: [
           { value: 'rueda_negocio', label: 'Rueda de negocio' },
           { value: 'congreso',      label: 'Congreso' },
@@ -3609,6 +3742,140 @@
         fmtFecha(iso) {
           if (!iso) return '—';
           return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        },
+
+        // ── métodos de detalle/inscritos (paso 8) ──
+        async abrirDetalle(ev) {
+          this.eventoActivo = ev;
+          this.vista = 'detalle';
+          this.inscBuscar = ''; this.inscFiltroEstado = '';
+          await Promise.all([this.fetchInscritos(), this.fetchResumen()]);
+        },
+
+        async fetchResumen() {
+          try {
+            const res = await fetch(`/api/eventos/${this.eventoActivo._id}/inscritos/resumen`, {
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) this.resumen = await res.json();
+          } catch {}
+        },
+
+        async fetchInscritos() {
+          if (!this.eventoActivo) return;
+          this.inscLoading = true;
+          try {
+            const params = new URLSearchParams({ limit: 200 });
+            if (this.inscBuscar) params.set('search', this.inscBuscar);
+            if (this.inscFiltroEstado) params.set('estado', this.inscFiltroEstado);
+            const res = await fetch(`/api/eventos/${this.eventoActivo._id}/inscritos?${params}`, {
+              headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            const data = await res.json();
+            this.inscritos2 = data.inscritos || [];
+          } catch { this.inscritos2 = []; }
+          finally { this.inscLoading = false; }
+        },
+
+        openNuevoInscrito() {
+          this.inscEditId = null;
+          this.inscForm = { nombre:'', apellido:'', cedula:'', cargo:'', empresa:'', nit:'', email:'', telefono:'', tipoAfiliacion:'', estado:'inscrito' };
+          this.inscFormError = '';
+          this.modalInsc = true;
+        },
+
+        openEditarInscrito(i) {
+          this.inscEditId = i._id;
+          this.inscForm = {
+            nombre:i.nombre||'', apellido:i.apellido||'', cedula:i.cedula||'', cargo:i.cargo||'',
+            empresa:i.empresa||'', nit:'', email:i.email||'', telefono:i.telefono||'',
+            tipoAfiliacion:i.tipoAfiliacion||'', estado:i.estado||'inscrito',
+          };
+          this.inscFormError = '';
+          this.modalInsc = true;
+        },
+
+        async submitInscrito() {
+          this.inscFormError = '';
+          if (!this.inscForm.nombre || !this.inscForm.nombre.trim()) { this.inscFormError = 'El nombre es obligatorio.'; return; }
+          this.inscFormLoading = true;
+          try {
+            const base = `/api/eventos/${this.eventoActivo._id}/inscritos`;
+            const url = this.inscEditId ? `${base}/${this.inscEditId}` : base;
+            const method = this.inscEditId ? 'PUT' : 'POST';
+            const payload = { ...this.inscForm };
+            if (!payload.tipoAfiliacion) delete payload.tipoAfiliacion;
+            const res = await fetch(url, {
+              method, headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+              credentials: 'include', body: JSON.stringify(payload),
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.message || 'No se pudo guardar.'); }
+            this.modalInsc = false;
+            await Promise.all([this.fetchInscritos(), this.fetchResumen()]);
+          } catch (err) { this.inscFormError = err.message || 'No se pudo guardar.'; }
+          finally { this.inscFormLoading = false; }
+        },
+
+        async checkin(i) {
+          try {
+            const res = await fetch(`/api/eventos/${this.eventoActivo._id}/inscritos/${i._id}/checkin`, {
+              method: 'PATCH', headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) { await Promise.all([this.fetchInscritos(), this.fetchResumen()]); }
+          } catch {}
+        },
+
+        async eliminarInscrito(i) {
+          if (!confirm(`¿Eliminar a ${i.nombre} ${i.apellido||''}?`)) return;
+          try {
+            const res = await fetch(`/api/eventos/${this.eventoActivo._id}/inscritos/${i._id}`, {
+              method: 'DELETE', headers: { Authorization: `Bearer ${this.token}` }, credentials: 'include',
+            });
+            if (res.ok) { await Promise.all([this.fetchInscritos(), this.fetchResumen()]); }
+          } catch {}
+        },
+
+        importarCSV(ev) {
+          const file = ev.target.files && ev.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async () => {
+            ev.target.value = '';
+            if (!confirm(`Importar inscritos desde "${file.name}"? Las cédulas ya existentes se actualizarán.`)) return;
+            try {
+              const res = await fetch(`/api/eventos/${this.eventoActivo._id}/inscritos/importar`, {
+                method: 'POST', headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+                credentials: 'include', body: JSON.stringify({ csv: reader.result }),
+              });
+              const d = await res.json();
+              if (!res.ok) { alert(d.message || 'No se pudo importar.'); return; }
+              alert(`Importación: ${d.creados} creados, ${d.actualizados} actualizados${d.errores?.length ? `, ${d.errores.length} con error` : ''}.`);
+              await Promise.all([this.fetchInscritos(), this.fetchResumen()]);
+            } catch { alert('No se pudo importar el CSV.'); }
+          };
+          reader.readAsText(file, 'UTF-8');
+        },
+
+        afiliacionBadge(t) {
+          const m = {
+            afiliado:    { label: 'Afiliado',    cls: 'bg-green-100 text-green-700' },
+            no_afiliado: { label: 'No afiliado', cls: 'bg-gray-100 text-gray-600' },
+            emprendedor: { label: 'Emprendedor', cls: 'bg-blue-100 text-blue-700' },
+            mixto:       { label: 'Mixto',       cls: 'bg-purple-100 text-purple-700' },
+          };
+          return m[t] || { label: '—', cls: 'bg-gray-100 text-gray-600' };
+        },
+
+        inscEstadoBadge(e) {
+          const m = {
+            inscrito:   { label: 'Inscrito',   cls: 'bg-blue-100 text-blue-700' },
+            asistio:    { label: 'Asistió',    cls: 'bg-green-100 text-green-700' },
+            no_asistio: { label: 'No asistió', cls: 'bg-gray-100 text-gray-600' },
+            cancelado:  { label: 'Cancelado',  cls: 'bg-red-100 text-red-700' },
+          };
+          return m[e] || { label: e, cls: 'bg-gray-100 text-gray-600' };
         },
       };
     }
