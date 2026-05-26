@@ -28,7 +28,8 @@ const eventoSchema = new mongoose.Schema(
       enum: ['presencial', 'virtual', 'hibrido'],
       default: 'presencial',
     },
-    cupoMaximo: { type: Number, default: 0, min: 0 }, // 0 = sin límite
+    cupoMaximo:     { type: Number, default: 0, min: 0 }, // 0 = sin límite
+    cupoPorEmpresa: { type: Number, default: 0, min: 0 }, // 0 = sin límite por empresa
     estado: {
       type: String,
       enum: ['borrador', 'publicado', 'en_curso', 'finalizado', 'cancelado'],

@@ -91,7 +91,7 @@ router.put('/:id', protect, authorize('admin', 'ejecutivo'), async (req, res) =>
 
     const campos = [
       'nombre', 'tipo', 'descripcion', 'fechaInicio', 'fechaFin',
-      'lugar', 'modalidad', 'cupoMaximo', 'estado', 'responsable', 'notas',
+      'lugar', 'modalidad', 'cupoMaximo', 'cupoPorEmpresa', 'estado', 'responsable', 'notas',
     ];
     campos.forEach((c) => {
       if (req.body[c] !== undefined) evento[c] = req.body[c];
@@ -117,5 +117,9 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
     res.status(500).json({ message: 'No se pudo eliminar el evento.' });
   }
 });
+
+// Inscritos anidados: /api/eventos/:eventoId/inscritos
+const inscritosRouter = require('./inscritos');
+router.use('/:eventoId/inscritos', inscritosRouter);
 
 module.exports = router;
