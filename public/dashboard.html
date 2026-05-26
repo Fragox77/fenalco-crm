@@ -2945,6 +2945,211 @@
 
       </section>
 
+      <!-- ═══════════════ EVENTOS (catálogo) ═══════════════ -->
+      <section x-show="activePage === 'eventos'" x-data="eventosApp()" x-init="init()" @page-shown.window="onShow($event)" class="space-y-6">
+
+        <!-- Encabezado -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 class="text-xl font-bold text-fenalco-purple">Eventos</h1>
+            <p class="text-sm text-fenalco-gray">
+              <span x-show="!loading" x-text="total + ' eventos'"></span>
+              <span x-show="loading">Cargando...</span>
+            </p>
+          </div>
+          <button x-show="puedeEditar" @click="openNuevo()"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-fenalco-purple hover:bg-fenalco-purple/90 text-white text-sm font-semibold rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Nuevo evento
+          </button>
+        </div>
+
+        <!-- Filtros -->
+        <div class="bg-white rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-3">
+          <div class="relative flex-1">
+            <input type="text" x-model="search" @input.debounce.400ms="page = 1; fetchEventos()"
+              placeholder="Buscar por nombre..."
+              class="w-full pl-10 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <button x-show="search" @click="search = ''; page = 1; fetchEventos()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+          <select x-model="filtroTipo" @change="page = 1; fetchEventos()"
+            class="border border-gray-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+            <option value="">Todos los tipos</option>
+            <template x-for="t in tipos" :key="t.value">
+              <option :value="t.value" x-text="t.label"></option>
+            </template>
+          </select>
+          <select x-model="filtroEstado" @change="page = 1; fetchEventos()"
+            class="border border-gray-200 rounded-lg text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+            <option value="">Todos los estados</option>
+            <option value="borrador">Borrador</option>
+            <option value="publicado">Publicado</option>
+            <option value="en_curso">En curso</option>
+            <option value="finalizado">Finalizado</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+
+        <!-- Listado -->
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div x-show="loading" class="p-8 text-center text-fenalco-gray text-sm">Cargando eventos...</div>
+          <div x-show="!loading && error" class="p-8 text-center text-red-500 text-sm" x-text="error"></div>
+          <div x-show="!loading && !error && eventos.length === 0" class="p-12 text-center text-fenalco-gray">
+            <p class="text-sm">Sin eventos registrados</p>
+          </div>
+          <div x-show="!loading && !error && eventos.length > 0" class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 text-fenalco-gray text-xs uppercase">
+                <tr>
+                  <th class="text-left px-4 py-3 font-semibold">Evento</th>
+                  <th class="text-left px-4 py-3 font-semibold">Tipo</th>
+                  <th class="text-left px-4 py-3 font-semibold">Fecha</th>
+                  <th class="text-left px-4 py-3 font-semibold">Lugar</th>
+                  <th class="text-left px-4 py-3 font-semibold">Estado</th>
+                  <th class="text-right px-4 py-3 font-semibold">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="ev in eventos" :key="ev._id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                      <p class="font-medium text-gray-800" x-text="ev.nombre"></p>
+                      <p x-show="ev.responsable?.nombre" class="text-xs text-fenalco-gray" x-text="'Responsable: ' + ev.responsable?.nombre"></p>
+                    </td>
+                    <td class="px-4 py-3 text-fenalco-gray" x-text="tipoLabel(ev.tipo)"></td>
+                    <td class="px-4 py-3 text-fenalco-gray" x-text="fmtFecha(ev.fechaInicio)"></td>
+                    <td class="px-4 py-3 text-fenalco-gray" x-text="ev.lugar || '—'"></td>
+                    <td class="px-4 py-3">
+                      <span :class="estadoBadge(ev.estado).cls" class="px-2 py-0.5 rounded-full text-xs font-medium" x-text="estadoBadge(ev.estado).label"></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center justify-end gap-2">
+                        <button x-show="puedeEditar" @click="openEditar(ev)" class="text-fenalco-blue hover:underline text-xs font-medium">Editar</button>
+                        <button x-show="puedeEliminar" @click="confirmarEliminar(ev)" class="text-red-600 hover:underline text-xs font-medium">Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Paginación -->
+          <div x-show="!loading && !error && totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm">
+            <button @click="if (page > 1) { page--; fetchEventos(); }" :disabled="page <= 1"
+              class="px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40">Anterior</button>
+            <span class="text-fenalco-gray" x-text="'Página ' + page + ' de ' + totalPages"></span>
+            <button @click="if (page < totalPages) { page++; fetchEventos(); }" :disabled="page >= totalPages"
+              class="px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40">Siguiente</button>
+          </div>
+        </div>
+
+        <!-- ═══ MODAL: CREAR / EDITAR ═══ -->
+        <div x-show="modalForm"
+          x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          @click.self="modalForm = false" @keydown.escape.window="modalForm = false" style="display:none;">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4" @click.stop>
+            <h3 class="font-bold text-fenalco-purple text-lg" x-text="editId ? 'Editar evento' : 'Nuevo evento'"></h3>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-fenalco-gray mb-1">Nombre *</label>
+                <input type="text" x-model="form.nombre" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-fenalco-gray mb-1">Tipo</label>
+                  <select x-model="form.tipo" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+                    <template x-for="t in tipos" :key="t.value"><option :value="t.value" x-text="t.label"></option></template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-fenalco-gray mb-1">Estado</label>
+                  <select x-model="form.estado" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+                    <option value="borrador">Borrador</option>
+                    <option value="publicado">Publicado</option>
+                    <option value="en_curso">En curso</option>
+                    <option value="finalizado">Finalizado</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-fenalco-gray mb-1">Inicio *</label>
+                  <input type="datetime-local" x-model="form.fechaInicio" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-fenalco-gray mb-1">Fin</label>
+                  <input type="datetime-local" x-model="form.fechaFin" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-fenalco-gray mb-1">Modalidad</label>
+                  <select x-model="form.modalidad" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+                    <option value="presencial">Presencial</option>
+                    <option value="virtual">Virtual</option>
+                    <option value="hibrido">Híbrido</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-fenalco-gray mb-1">Cupo máximo (0 = sin límite)</label>
+                  <input type="number" min="0" x-model.number="form.cupoMaximo" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-fenalco-gray mb-1">Lugar</label>
+                <input type="text" x-model="form.lugar" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-fenalco-gray mb-1">Descripción</label>
+                <textarea x-model="form.descripcion" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-fenalco-gray mb-1">Notas internas</label>
+                <textarea x-model="form.notas" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fenalco-purple/30"></textarea>
+              </div>
+            </div>
+
+            <div x-show="formError" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2.5" x-text="formError"></div>
+
+            <div class="flex gap-3 justify-end">
+              <button @click="modalForm = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50">Cancelar</button>
+              <button @click="submitForm()" :disabled="formLoading"
+                class="flex items-center gap-2 px-4 py-2 bg-fenalco-purple hover:bg-fenalco-purple/90 disabled:opacity-60 text-white text-sm font-semibold rounded-lg">
+                <svg x-show="formLoading" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                <span x-text="formLoading ? 'Guardando…' : 'Guardar'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ MODAL: CONFIRMAR ELIMINACIÓN ═══ -->
+        <div x-show="modalEliminar"
+          x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+          class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          @click.self="modalEliminar = false" @keydown.escape.window="modalEliminar = false" style="display:none;">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4" @click.stop>
+            <div>
+              <h3 class="font-bold text-gray-800">Eliminar evento</h3>
+              <p class="text-sm text-fenalco-gray mt-1">¿Eliminar <span class="font-medium text-gray-800" x-text="eliminando?.nombre"></span>? Esta acción no se puede deshacer.</p>
+            </div>
+            <div x-show="eliminarError" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2" x-text="eliminarError"></div>
+            <div class="flex gap-3 justify-end">
+              <button @click="modalEliminar = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50">Cancelar</button>
+              <button @click="eliminarEvento()" :disabled="eliminarLoading"
+                class="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg">
+                <span x-text="eliminarLoading ? 'Eliminando…' : 'Sí, eliminar'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
     </main>
   </div>
 
@@ -2997,6 +3202,11 @@
               icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>',
             },
             {
+              id: 'eventos',
+              label: 'Eventos',
+              icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
+            },
+            {
               id: 'reportes',
               label: 'Reportes',
               icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
@@ -3033,7 +3243,7 @@
         async init() {
           if (!this.token) { window.location.href = '/'; return; }
           const hash = window.location.hash.replace('#', '');
-          const paginasValidas = ['dashboard', 'afiliados', 'cartera', 'reportes', 'ejecutivos', 'notificaciones', 'usuarios'];
+          const paginasValidas = ['dashboard', 'afiliados', 'cartera', 'eventos', 'reportes', 'ejecutivos', 'notificaciones', 'usuarios'];
           if (hash && paginasValidas.includes(hash)) {
             this.activePage = hash;
           } else {
@@ -3193,6 +3403,212 @@
           localStorage.removeItem('crm_role');
           localStorage.removeItem('crm_nombre');
           window.location.href = '/';
+        },
+      };
+    }
+
+    // ── Componente eventos (SPA) ────────────────────────────
+    function eventosApp() {
+      return {
+        token: localStorage.getItem('crm_token'),
+        role:  localStorage.getItem('crm_role') || '',
+        loading: true,
+        error: '',
+        loaded: false,
+        eventos: [],
+        total: 0,
+        page: 1,
+        totalPages: 1,
+        search: '',
+        filtroEstado: '',
+        filtroTipo: '',
+
+        // modal form
+        modalForm: false,
+        editId: null,
+        form: {},
+        formError: '',
+        formLoading: false,
+
+        // modal eliminar
+        modalEliminar: false,
+        eliminando: null,
+        eliminarError: '',
+        eliminarLoading: false,
+
+        tipos: [
+          { value: 'rueda_negocio', label: 'Rueda de negocio' },
+          { value: 'congreso',      label: 'Congreso' },
+          { value: 'feria',         label: 'Feria' },
+          { value: 'seminario',     label: 'Seminario' },
+          { value: 'diplomado',     label: 'Diplomado' },
+          { value: 'taller',        label: 'Taller' },
+          { value: 'bootcamp',      label: 'Bootcamp' },
+          { value: 'networking',    label: 'Networking' },
+          { value: 'otro',          label: 'Otro' },
+        ],
+
+        get puedeEditar()   { return this.role === 'admin' || this.role === 'ejecutivo'; },
+        get puedeEliminar() { return this.role === 'admin'; },
+
+        init() {
+          // Sección oculta al arrancar; el render se controla en onShow().
+        },
+
+        onShow(e) {
+          if (e.detail?.page !== 'eventos') return;
+          if (!this.loaded) this.fetchEventos();
+        },
+
+        async fetchEventos() {
+          this.loading = true;
+          this.error = '';
+          try {
+            const params = new URLSearchParams({ page: this.page, limit: 50 });
+            if (this.search) params.set('search', this.search);
+            if (this.filtroEstado) params.set('estado', this.filtroEstado);
+            if (this.filtroTipo) params.set('tipo', this.filtroTipo);
+            const res = await fetch(`/api/eventos?${params}`, {
+              headers: { Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            if (!res.ok) throw new Error('No se pudieron cargar los eventos.');
+            const data = await res.json();
+            this.eventos = data.eventos;
+            this.total = data.total;
+            this.totalPages = data.totalPages;
+            this.page = data.page;
+            this.loaded = true;
+          } catch (err) {
+            this.error = err.message || 'No se pudieron cargar los eventos.';
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        emptyForm() {
+          return {
+            nombre: '', tipo: 'otro', descripcion: '',
+            fechaInicio: '', fechaFin: '', lugar: '',
+            modalidad: 'presencial', cupoMaximo: 0,
+            estado: 'borrador', notas: '',
+          };
+        },
+
+        toInput(iso) {
+          if (!iso) return '';
+          const d = new Date(iso);
+          if (isNaN(d)) return '';
+          // ajuste a hora local para el input datetime-local
+          const off = d.getTimezoneOffset();
+          return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
+        },
+
+        openNuevo() {
+          this.editId = null;
+          this.form = this.emptyForm();
+          this.formError = '';
+          this.modalForm = true;
+        },
+
+        openEditar(ev) {
+          this.editId = ev._id;
+          this.form = {
+            nombre: ev.nombre || '',
+            tipo: ev.tipo || 'otro',
+            descripcion: ev.descripcion || '',
+            fechaInicio: this.toInput(ev.fechaInicio),
+            fechaFin: this.toInput(ev.fechaFin),
+            lugar: ev.lugar || '',
+            modalidad: ev.modalidad || 'presencial',
+            cupoMaximo: ev.cupoMaximo ?? 0,
+            estado: ev.estado || 'borrador',
+            notas: ev.notas || '',
+          };
+          this.formError = '';
+          this.modalForm = true;
+        },
+
+        async submitForm() {
+          this.formError = '';
+          if (!this.form.nombre || !this.form.nombre.trim()) { this.formError = 'El nombre es obligatorio.'; return; }
+          if (!this.form.fechaInicio) { this.formError = 'La fecha de inicio es obligatoria.'; return; }
+          this.formLoading = true;
+          try {
+            const payload = { ...this.form };
+            if (!payload.fechaFin) delete payload.fechaFin;
+            const url = this.editId ? `/api/eventos/${this.editId}` : '/api/eventos';
+            const method = this.editId ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+              method,
+              headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(payload),
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            if (!res.ok) {
+              const d = await res.json().catch(() => ({}));
+              throw new Error(d.message || 'No se pudo guardar. Intenta de nuevo.');
+            }
+            this.modalForm = false;
+            this.fetchEventos();
+          } catch (err) {
+            this.formError = err.message || 'No se pudo guardar. Intenta de nuevo.';
+          } finally {
+            this.formLoading = false;
+          }
+        },
+
+        confirmarEliminar(ev) {
+          this.eliminando = ev;
+          this.eliminarError = '';
+          this.modalEliminar = true;
+        },
+
+        async eliminarEvento() {
+          if (!this.eliminando) return;
+          this.eliminarLoading = true;
+          this.eliminarError = '';
+          try {
+            const res = await fetch(`/api/eventos/${this.eliminando._id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${this.token}` },
+              credentials: 'include',
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            if (!res.ok) {
+              const d = await res.json().catch(() => ({}));
+              throw new Error(d.message || 'No se pudo eliminar.');
+            }
+            this.modalEliminar = false;
+            this.eliminando = null;
+            this.fetchEventos();
+          } catch (err) {
+            this.eliminarError = err.message || 'No se pudo eliminar.';
+          } finally {
+            this.eliminarLoading = false;
+          }
+        },
+
+        tipoLabel(tipo) {
+          return (this.tipos.find(t => t.value === tipo) || {}).label || tipo;
+        },
+
+        estadoBadge(estado) {
+          const map = {
+            borrador:   { label: 'Borrador',   cls: 'bg-gray-100 text-gray-600' },
+            publicado:  { label: 'Publicado',  cls: 'bg-blue-100 text-blue-700' },
+            en_curso:   { label: 'En curso',   cls: 'bg-green-100 text-green-700' },
+            finalizado: { label: 'Finalizado', cls: 'bg-purple-100 text-purple-700' },
+            cancelado:  { label: 'Cancelado',  cls: 'bg-red-100 text-red-700' },
+          };
+          return map[estado] || { label: estado, cls: 'bg-gray-100 text-gray-600' };
+        },
+
+        fmtFecha(iso) {
+          if (!iso) return '—';
+          return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         },
       };
     }
