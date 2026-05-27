@@ -24,7 +24,7 @@ const inscritoSchema = new mongoose.Schema(
     estado: { type: String, enum: ['inscrito', 'asistio', 'no_asistio', 'cancelado'], default: 'inscrito' },
     horaCheckin: { type: Date },
     codigo: { type: String, trim: true },
-    origen: { type: String, enum: ['manual', 'importacion', 'registro_qr'], default: 'manual' },
+    origen: { type: String, enum: ['manual', 'importacion', 'registro_qr', 'formulario_publico'], default: 'manual' },
     referenciaGrupo: { type: String, trim: true },
 
     pago: {
@@ -44,6 +44,12 @@ const inscritoSchema = new mongoose.Schema(
     },
 
     observaciones: { type: String, trim: true },
+    consentimiento: {
+      autorizado: { type: Boolean, default: false },
+      fecha:      { type: Date },
+      version:    { type: String, trim: true },
+    },
+    respuestas: { type: Map, of: String }, // respuestas a camposPersonalizados (clave → valor)
   },
   { timestamps: true }
 );

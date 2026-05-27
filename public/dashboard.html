@@ -3063,6 +3063,7 @@
               <div class="flex items-center gap-2">
                 <button x-show="puedeEditar" @click="$refs.csvFile.click()" class="inline-flex items-center gap-2 px-4 py-2 border border-fenalco-purple text-fenalco-purple text-sm font-semibold rounded-lg hover:bg-fenalco-purple/5">Importar CSV</button>
                 <input type="file" x-ref="csvFile" accept=".csv,text/csv" class="hidden" @change="importarCSV($event)">
+                <button x-show="puedeEditar" @click="abrirConfigForm()" class="inline-flex items-center gap-2 px-4 py-2 border border-fenalco-blue text-fenalco-blue text-sm font-semibold rounded-lg hover:bg-fenalco-blue/5">Configurar formulario</button>
                 <button x-show="puedeEditar" @click="openNuevoInscrito()"
                   class="inline-flex items-center gap-2 px-4 py-2 bg-fenalco-purple hover:bg-fenalco-purple/90 text-white text-sm font-semibold rounded-lg">
                   + Inscribir persona
@@ -3223,6 +3224,74 @@
                 class="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg">
                 <span x-text="eliminarLoading ? 'Eliminando…' : 'Sí, eliminar'"></span>
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ MODAL: CONFIGURAR FORMULARIO ═══ -->
+        <div x-show="modalConfig" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          @click.self="modalConfig = false" @keydown.escape.window="modalConfig = false" style="display:none;">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4" @click.stop>
+            <h3 class="font-bold text-fenalco-purple text-lg">Configurar formulario de inscripción</h3>
+
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" x-model="cfg.habilitado"> Formulario habilitado (público)
+            </label>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Cierra el</label>
+                <input type="datetime-local" x-model="cfg.fechaCierre" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+              <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Versión Habeas Data</label>
+                <input type="text" x-model="cfg.habeasData.version" placeholder="2026-05" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+            </div>
+            <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Encabezado</label>
+              <input type="text" x-model="cfg.encabezado" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+            <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Descripción</label>
+              <textarea x-model="cfg.descripcion" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></textarea></div>
+            <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Mensaje de confirmación</label>
+              <input type="text" x-model="cfg.mensajeConfirmacion" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></div>
+
+            <p class="text-xs font-semibold text-fenalco-gray uppercase mt-2">Campos estándar</p>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <template x-for="k in ['apellido','cedula','telefono','cargo','empresa']" :key="k">
+                <div class="flex items-center gap-3 border border-gray-100 rounded-lg px-3 py-2">
+                  <span class="capitalize flex-1" x-text="k"></span>
+                  <label class="flex items-center gap-1 text-xs"><input type="checkbox" x-model="cfg.campos[k].visible"> visible</label>
+                  <label class="flex items-center gap-1 text-xs"><input type="checkbox" x-model="cfg.campos[k].requerido"> oblig.</label>
+                </div>
+              </template>
+            </div>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" x-model="cfg.preguntaAfiliacion.visible"> Mostrar pregunta "¿Eres afiliado?" (afiliado/no/emprendedor)
+            </label>
+
+            <div class="flex items-center justify-between mt-2">
+              <p class="text-xs font-semibold text-fenalco-gray uppercase">Campos personalizados</p>
+              <button @click="cfg.camposPersonalizados.push({ clave:'', etiqueta:'', tipo:'texto', opciones:[], requerido:false })" class="text-fenalco-blue text-xs font-medium">+ Agregar campo</button>
+            </div>
+            <template x-for="(c, idx) in cfg.camposPersonalizados" :key="idx">
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <input type="text" x-model="c.etiqueta" placeholder="Etiqueta" class="col-span-4 border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
+                <input type="text" x-model="c.clave" placeholder="clave" class="col-span-3 border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
+                <select x-model="c.tipo" class="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-sm"><option value="texto">texto</option><option value="select">select</option><option value="checkbox">checkbox</option></select>
+                <label class="col-span-2 flex items-center gap-1 text-xs"><input type="checkbox" x-model="c.requerido"> oblig.</label>
+                <button @click="cfg.camposPersonalizados.splice(idx,1)" class="col-span-1 text-red-600 text-xs">✕</button>
+              </div>
+            </template>
+
+            <div><label class="block text-xs font-medium text-fenalco-gray mb-1">Texto de consentimiento (Habeas Data / Ley 1581)</label>
+              <textarea x-model="cfg.habeasData.texto" rows="3" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></textarea>
+              <label class="flex items-center gap-2 text-xs mt-1"><input type="checkbox" x-model="cfg.habeasData.requerido"> Consentimiento obligatorio</label>
+            </div>
+
+            <div x-show="cfgUrl" class="bg-fenalco-blue/5 rounded-lg p-3 text-sm">
+              <p class="text-xs text-fenalco-gray mb-1">Link público del formulario:</p>
+              <a :href="cfgUrl" target="_blank" class="text-fenalco-blue break-all" x-text="cfgUrl"></a>
+            </div>
+            <div x-show="cfgError" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2.5" x-text="cfgError"></div>
+
+            <div class="flex gap-3 justify-end">
+              <button @click="modalConfig = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-fenalco-gray hover:bg-gray-50">Cerrar</button>
+              <button @click="guardarConfigForm()" :disabled="cfgLoading" class="px-4 py-2 bg-fenalco-purple hover:bg-fenalco-purple/90 disabled:opacity-60 text-white text-sm font-semibold rounded-lg" x-text="cfgLoading ? 'Guardando…' : 'Guardar configuración'"></button>
             </div>
           </div>
         </div>
@@ -3569,6 +3638,13 @@
         inscFormError: '',
         inscFormLoading: false,
 
+        // ── configuración de formulario (paso 9) ──
+        modalConfig: false,
+        cfg: {},
+        cfgUrl: '',
+        cfgError: '',
+        cfgLoading: false,
+
         tipos: [
           { value: 'rueda_negocio', label: 'Rueda de negocio' },
           { value: 'congreso',      label: 'Congreso' },
@@ -3876,6 +3952,59 @@
             cancelado:  { label: 'Cancelado',  cls: 'bg-red-100 text-red-700' },
           };
           return m[e] || { label: e, cls: 'bg-gray-100 text-gray-600' };
+        },
+
+        cfgDefault() {
+          return {
+            habilitado: false, fechaCierre: '', encabezado: '', descripcion: '', mensajeConfirmacion: '',
+            campos: {
+              apellido: { visible: true, requerido: true }, cedula: { visible: true, requerido: true },
+              telefono: { visible: true, requerido: false }, cargo: { visible: true, requerido: false },
+              empresa:  { visible: true, requerido: false },
+            },
+            preguntaAfiliacion: { visible: true },
+            camposPersonalizados: [],
+            habeasData: { texto: '', requerido: true, version: '' },
+          };
+        },
+
+        abrirConfigForm() {
+          const base = this.cfgDefault();
+          const actual = this.eventoActivo?.formularioConfig || {};
+          this.cfg = {
+            ...base, ...actual,
+            campos: { ...base.campos, ...(actual.campos || {}) },
+            preguntaAfiliacion: { ...base.preguntaAfiliacion, ...(actual.preguntaAfiliacion || {}) },
+            habeasData: { ...base.habeasData, ...(actual.habeasData || {}) },
+            camposPersonalizados: actual.camposPersonalizados ? JSON.parse(JSON.stringify(actual.camposPersonalizados)) : [],
+          };
+          if (this.cfg.fechaCierre) this.cfg.fechaCierre = this.toInput(this.cfg.fechaCierre);
+          this.cfgUrl = this.eventoActivo?.urlPublica || '';
+          this.cfgError = '';
+          this.modalConfig = true;
+        },
+
+        async guardarConfigForm() {
+          this.cfgError = '';
+          this.cfgLoading = true;
+          try {
+            const res = await fetch(`/api/eventos/${this.eventoActivo._id}/formulario`, {
+              method: 'PUT',
+              headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ formularioConfig: this.cfg }),
+            });
+            if (res.status === 401) { window.location.href = '/'; return; }
+            if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.message || 'No se pudo guardar.'); }
+            const data = await res.json();
+            this.cfgUrl = data.urlPublica || '';
+            if (this.eventoActivo) {
+              this.eventoActivo.formularioConfig = data.evento.formularioConfig;
+              this.eventoActivo.slug = data.evento.slug;
+              this.eventoActivo.urlPublica = data.urlPublica;
+            }
+          } catch (err) { this.cfgError = err.message || 'No se pudo guardar.'; }
+          finally { this.cfgLoading = false; }
         },
       };
     }

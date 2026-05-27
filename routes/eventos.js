@@ -7,6 +7,16 @@ const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const normalizar = (s) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+const slugify = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+
+async function generarSlugUnico(Evento, nombre) {
+  const base = slugify(nombre) || 'evento';
+  let slug = base, n = 1;
+  while (await Evento.exists({ slug })) { slug = `${base}-${++n}`; }
+  return slug;
+}
+
 // GET /api/eventos → listado con búsqueda, filtros y paginación
 router.get('/', protect, async (req, res) => {
   try {
@@ -50,6 +60,7 @@ router.get('/:id', protect, async (req, res) => {
       .populate('responsable', 'nombre email')
       .lean();
     if (!evento) return res.status(404).json({ message: 'Evento no encontrado.' });
+    evento.urlPublica = evento.slug ? `${process.env.SATELITE_URL || ''}/f/${evento.slug}` : null;
     res.json(evento);
   } catch (error) {
     res.status(500).json({ message: 'No se pudo obtener el evento.' });
@@ -116,6 +127,23 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'No se pudo eliminar el evento.' });
   }
+});
+
+// PUT /api/eventos/:id/formulario → guardar configuración del formulario público
+router.put('/:id/formulario', protect, authorize('admin', 'ejecutivo'), async (req, res) => {
+  try {
+    const evento = await Evento.findById(req.params.id);
+    if (!evento) return res.status(404).json({ message: 'Evento no encontrado.' });
+
+    if (req.body.formularioConfig !== undefined) evento.formularioConfig = req.body.formularioConfig;
+
+    if (evento.formularioConfig?.habilitado && !evento.slug) {
+      evento.slug = await generarSlugUnico(Evento, evento.nombre);
+    }
+    await evento.save();
+    const urlPublica = evento.slug ? `${process.env.SATELITE_URL || ''}/f/${evento.slug}` : null;
+    res.json({ evento, urlPublica });
+  } catch (e) { res.status(500).json({ message: 'No se pudo guardar la configuración del formulario.' }); }
 });
 
 // Inscritos anidados: /api/eventos/:eventoId/inscritos
