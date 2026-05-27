@@ -3640,7 +3640,17 @@
 
         // ── configuración de formulario (paso 9) ──
         modalConfig: false,
-        cfg: {},
+        cfg: {
+          habilitado: false, fechaCierre: '', encabezado: '', descripcion: '', mensajeConfirmacion: '',
+          campos: {
+            apellido: { visible: true, requerido: true }, cedula: { visible: true, requerido: true },
+            telefono: { visible: true, requerido: false }, cargo: { visible: true, requerido: false },
+            empresa:  { visible: true, requerido: false },
+          },
+          preguntaAfiliacion: { visible: true },
+          camposPersonalizados: [],
+          habeasData: { texto: '', requerido: true, version: '' },
+        },
         cfgUrl: '',
         cfgError: '',
         cfgLoading: false,
