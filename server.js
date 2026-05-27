@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const afiliadosRoutes = require('./routes/afiliados');
 const notificacionesRoutes = require('./routes/notificaciones');
 const eventosRoutes = require('./routes/eventos');
+const publicFormsRoutes = require('./routes/publicForms');
 const { iniciarJob } = require('./services/notificationJob');
 
 const path = require('path');
@@ -30,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/afiliados', afiliadosRoutes);
 app.use('/api/notificaciones', notificacionesRoutes);
 app.use('/api/eventos', eventosRoutes);
+app.use('/api/public-forms', publicFormsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

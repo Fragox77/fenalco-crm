@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const QRCode = require('qrcode');
 
 function createTransporter() {
   if (!process.env.SMTP_USER || process.env.SMTP_USER === 'tu_correo@gmail.com') {
@@ -171,4 +172,41 @@ async function enviarAlertaVencimiento(destinatario, afiliados) {
   }
 }
 
-module.exports = { enviarAlertaMora, enviarAlertaCompromisosVencidos, enviarAlertaVencimiento };
+async function enviarConfirmacionInscripcion(inscrito, evento) {
+  const transporter = createTransporter();
+  if (!transporter || !inscrito.email) return false;
+
+  let qrBuffer = null;
+  try { qrBuffer = await QRCode.toBuffer(String(inscrito.codigo || ''), { width: 220, margin: 1 }); } catch (_e) {}
+
+  const fecha = evento.fechaInicio ? new Date(evento.fechaInicio).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const contenido = `
+    <p>Hola <strong>${inscrito.nombre} ${inscrito.apellido || ''}</strong>,</p>
+    <p>${evento.formularioConfig?.mensajeConfirmacion || 'Tu inscripción ha sido registrada.'}</p>
+    <table>
+      <tbody>
+        <tr><th>Evento</th><td>${evento.nombre}</td></tr>
+        <tr><th>Fecha</th><td>${fecha}</td></tr>
+        <tr><th>Lugar</th><td>${evento.lugar || '—'}</td></tr>
+        <tr><th>Tu código</th><td><strong>${inscrito.codigo}</strong></td></tr>
+      </tbody>
+    </table>
+    ${qrBuffer ? '<p>Presenta este código QR el día del evento:</p><p><img src="cid:qrcarnet" alt="QR" style="width:180px;height:180px"/></p>' : ''}
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'CRM Fenalco <noreply@fenalco.com>',
+      to: inscrito.email,
+      subject: `✅ Inscripción confirmada — ${evento.nombre}`,
+      html: htmlBase(contenido),
+      attachments: qrBuffer ? [{ filename: 'qr.png', content: qrBuffer, cid: 'qrcarnet' }] : [],
+    });
+    return true;
+  } catch (err) {
+    console.error('[Email] Error al enviar confirmación de inscripción:', err.message);
+    return false;
+  }
+}
+
+module.exports = { enviarAlertaMora, enviarAlertaCompromisosVencidos, enviarAlertaVencimiento, enviarConfirmacionInscripcion };
