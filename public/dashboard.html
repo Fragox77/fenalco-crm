@@ -3775,6 +3775,9 @@
           try {
             const payload = { ...this.form };
             if (!payload.fechaFin) delete payload.fechaFin;
+            // convertir datetime-local (hora local) a ISO UTC para que el server no lo malinterprete
+            if (payload.fechaInicio) payload.fechaInicio = new Date(payload.fechaInicio).toISOString();
+            if (payload.fechaFin)    payload.fechaFin    = new Date(payload.fechaFin).toISOString();
             const url = this.editId ? `/api/eventos/${this.editId}` : '/api/eventos';
             const method = this.editId ? 'PUT' : 'POST';
             const res = await fetch(url, {
