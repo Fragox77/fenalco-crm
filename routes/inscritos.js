@@ -66,6 +66,7 @@ router.get('/', protect, async (req, res) => {
         { apellido: new RegExp(q, 'i') },
         { empresa:  new RegExp(q, 'i') },
         { codigo:   new RegExp(q, 'i') },
+        { respuestasTexto: new RegExp(q, 'i') },
         ...(num.length >= 4 ? [{ cedulaNorm: new RegExp(num) }] : []),
       ];
     }

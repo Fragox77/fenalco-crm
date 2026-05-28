@@ -50,6 +50,7 @@ const inscritoSchema = new mongoose.Schema(
       version:    { type: String, trim: true },
     },
     respuestas: { type: Map, of: String }, // respuestas a camposPersonalizados (clave → valor)
+    respuestasTexto: { type: String, trim: true }, // valores de respuestas concatenados, para búsqueda
   },
   { timestamps: true }
 );
@@ -57,9 +58,17 @@ const inscritoSchema = new mongoose.Schema(
 // cedulaNorm = solo dígitos
 inscritoSchema.pre('save', function () {
   this.cedulaNorm = String(this.cedula || '').replace(/\D/g, '');
+  if (this.respuestas && this.respuestas.size) {
+    const vals = [];
+    this.respuestas.forEach((v) => { if (v) vals.push(String(v)); });
+    this.respuestasTexto = vals.join(' ').toLowerCase();
+  } else {
+    this.respuestasTexto = '';
+  }
 });
 
 inscritoSchema.index({ evento: 1, cedulaNorm: 1 });
 inscritoSchema.index({ afiliado: 1 });
+inscritoSchema.index({ evento: 1, respuestasTexto: 1 });
 
 module.exports = mongoose.model('Inscrito', inscritoSchema);
