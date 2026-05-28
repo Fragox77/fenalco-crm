@@ -9,6 +9,9 @@ const { enviarConfirmacionInscripcion } = require('../services/emailService');
 async function getEventoAbierto(slug) {
   const ev = await Evento.findOne({ slug });
   if (!ev || !ev.formularioConfig?.habilitado) { const e = new Error('Formulario no disponible.'); e.status = 404; throw e; }
+  if (!['publicado', 'en_curso'].includes(ev.estado)) {
+    const e = new Error('Formulario no disponible.'); e.status = 404; throw e;
+  }
   if (ev.formularioConfig.fechaCierre && new Date() > new Date(ev.formularioConfig.fechaCierre)) {
     const e = new Error('El formulario está cerrado.'); e.status = 410; throw e;
   }
